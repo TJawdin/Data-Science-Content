@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import os
-from predict import predict_pts
+from src.predict import predict_pts
 
 # Page config (must be first Streamlit command)
 st.set_page_config(
