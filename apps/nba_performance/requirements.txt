@@ -5,4 +5,3 @@ xgboost
 joblib
 scikit-learn
 numpy
-predict
