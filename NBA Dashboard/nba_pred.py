@@ -1,7 +1,6 @@
 
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import os
 from predict import predict_pts
 
@@ -189,4 +188,5 @@ with st.form("prediction_form"):
 
 # Footer
 st.divider()
+
 st.caption("📊 NBA Player Performance Dashboard | Data updates may vary")
