@@ -1,0 +1,6 @@
+1. Streamlit
+2. Pandas
+3. Plotly
+4. XGBoost
+5. Os
+6. Joblib
