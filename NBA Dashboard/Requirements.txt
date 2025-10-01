@@ -1,7 +1,5 @@
 1. Streamlit
 2. Pandas
-3. Plotly.express
-4. XGBoost
-5. Os
-
-6. Joblib
+3. XGBoost
+4. Os
+5. Joblib
