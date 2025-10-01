@@ -1,0 +1,9 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.streamlit/
+.DS_Store
+.vscode/
+apps/*/src/models/*.pkl
+apps/*/src/models/*.joblib
