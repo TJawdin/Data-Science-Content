@@ -46,18 +46,18 @@ def unwrap_model(m):
 @st.cache_resource(show_spinner=False)
 def load_model_and_features():
     """Load the trained model and feature schema from artifacts."""
-    assert ARTIFACTS.exists(), "artifacts/ directory not found. Run Step 7E first."
+    assert ARTIFACTS.exists(), "artifacts/ directory not found."
     
     # Find model file
     candidates = sorted(ARTIFACTS.glob("model_*.pkl"))
-    assert candidates, "No model_*.pkl found in artifacts/. Run Step 7E to save the model."
+    assert candidates, "No model_*.pkl found in artifacts/."
     model_path = candidates[0]
     
     # Load model
     model = joblib.load(model_path)
     
     # Load features
-    assert FEATURES_JSON.exists(), "feature_names.json not found in artifacts/. Run Step 7E first."
+    assert FEATURES_JSON.exists(), "feature_names.json not found in artifacts/."
     with open(FEATURES_JSON, "r") as f:
         features = json.load(f)
     
@@ -773,3 +773,4 @@ with footer_col3:
 
 st.markdown("---")
 st.caption("Built with ❤️ using Streamlit | Trained on Olist Brazilian E-Commerce data")
+
