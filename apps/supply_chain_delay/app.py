@@ -203,7 +203,6 @@ try:
     """, unsafe_allow_html=True)
 except Exception as e:
     st.error(f"❌ **Failed to load artifacts:** {e}")
-    st.error("Make sure you've run Step 7E to save the model and Step 8 for explainability artifacts.")
     st.stop()
 
 # ----------------------- Tabs Layout -------------------------
@@ -773,4 +772,5 @@ with footer_col3:
 
 st.markdown("---")
 st.caption("Built with ❤️ using Streamlit | Trained on Olist Brazilian E-Commerce data")
+
 
