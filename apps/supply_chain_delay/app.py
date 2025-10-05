@@ -194,6 +194,14 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Get top features by importance
+if hasattr(base_model, "feature_importances_"):
+    importances = pd.Series(base_model.feature_importances_, index=TRAIN_FEATURES)
+    TOP_FEATURES = importances.nlargest(8).index.tolist()
+else:
+    # Fallback: use first 8 features
+    TOP_FEATURES = TRAIN_FEATURES[:8]
+    
 # ----------------------- Sidebar -----------------------------
 with st.sidebar:
     st.image("https://img.icons8.com/fluency/96/000000/package.png", width=80)
@@ -454,7 +462,7 @@ with tab_single:
         st.info("💡 **Quick Tip**\n\nUse the JSON input for faster entry of multiple features")
     
     # Show top N features in form
-    N_TOP = min(12, len(TRAIN_FEATURES))
+    N_TOP = len(TOP_FEATURES)  # Will be 8 or fewer
     
     with st.form(key="single_form"):
         st.markdown(f"**Enter values for top {N_TOP} features:**")
@@ -822,6 +830,7 @@ with footer_col3:
 st.markdown("---")
 
 st.caption("Built with ❤️ using Streamlit | Trained on Olist Brazilian E-Commerce data")
+
 
 
 
