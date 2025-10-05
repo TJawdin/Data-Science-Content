@@ -1,2 +1,3 @@
 -r apps/nba_performance/requirements.txt
 -r apps/uber_pickups/requirements.txt
+-r apps/supply_chain_delay/requirements.txt
