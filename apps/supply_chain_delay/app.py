@@ -108,6 +108,53 @@ def predict_batch(model, df_input: pd.DataFrame, features: list, threshold: floa
     pred = (proba >= threshold).astype(int)
     return proba, pred
 
+# ----------------------- Feature Name Mapping ----------------
+# Friendly feature names mapping for better UX
+FEATURE_LABELS = {
+    "COUNT(items)": "📦 Number of Items",
+    "MEAN(items.freight_value)": "🚚 Avg Shipping Cost",
+    "MEAN(items.order_item_id)": "📋 Avg Item Position",
+    "MEAN(items.price)": "💰 Avg Item Price",
+    "SUM(items.freight_value)": "🚚 Total Shipping Cost",
+    "SUM(items.order_item_id)": "📋 Total Item Positions",
+    "SUM(items.price)": "💰 Total Order Value",
+    "customers.customer_zip_code_prefix": "📍 Customer ZIP Code",
+    "MEAN(items.products.product_description_lenght)": "📝 Avg Description Length",
+    "MEAN(items.products.product_height_cm)": "📏 Avg Height (cm)",
+    "MEAN(items.products.product_length_cm)": "📏 Avg Length (cm)",
+    "MEAN(items.products.product_name_lenght)": "🏷️ Avg Name Length",
+    "MEAN(items.products.product_photos_qty)": "📷 Avg Photos Count",
+    "MEAN(items.products.product_weight_g)": "⚖️ Avg Weight (g)",
+    "MEAN(items.products.product_width_cm)": "📏 Avg Width (cm)",
+    "MEAN(items.sellers.seller_zip_code_prefix)": "🏪 Avg Seller ZIP",
+    "NUM_UNIQUE(items.DAY(shipping_limit_date))": "📅 Unique Ship Days",
+    "NUM_UNIQUE(items.MONTH(shipping_limit_date))": "📅 Unique Ship Months",
+    "NUM_UNIQUE(items.WEEKDAY(shipping_limit_date))": "📅 Unique Weekdays",
+    "NUM_UNIQUE(items.products.product_category_name)": "🏷️ Unique Categories",
+    "NUM_UNIQUE(items.sellers.seller_city)": "🏙️ Unique Seller Cities",
+    "NUM_UNIQUE(items.sellers.seller_state)": "🗺️ Unique Seller States",
+    "SUM(items.products.product_description_lenght)": "📝 Total Description Length",
+    "SUM(items.products.product_height_cm)": "📏 Total Height (cm)",
+    "SUM(items.products.product_length_cm)": "📏 Total Length (cm)",
+    "SUM(items.products.product_name_lenght)": "🏷️ Total Name Length",
+    "SUM(items.products.product_photos_qty)": "📷 Total Photos",
+    "SUM(items.products.product_weight_g)": "⚖️ Total Weight (g)",
+    "SUM(items.products.product_width_cm)": "📏 Total Width (cm)",
+    "SUM(items.sellers.seller_zip_code_prefix)": "🏪 Total Seller ZIP",
+    "customers.COUNT(orders)": "📦 Customer Order Count",
+    "customers.COUNT(items)": "📦 Customer Item Count",
+    "customers.MEAN(items.freight_value)": "🚚 Customer Avg Shipping",
+    "customers.MEAN(items.order_item_id)": "📋 Customer Avg Item Pos",
+    "customers.MEAN(items.price)": "💰 Customer Avg Price",
+    "customers.SUM(items.freight_value)": "🚚 Customer Total Shipping",
+    "customers.SUM(items.order_item_id)": "📋 Customer Total Items",
+    "customers.SUM(items.price)": "💰 Customer Total Spent"
+}
+
+def get_friendly_name(feature_name):
+    """Convert technical feature name to user-friendly label."""
+    return FEATURE_LABELS.get(feature_name, feature_name)
+
 # ----------------------- Custom CSS --------------------------
 st.markdown("""
     <style>
@@ -775,5 +822,6 @@ with footer_col3:
 st.markdown("---")
 
 st.caption("Built with ❤️ using Streamlit | Trained on Olist Brazilian E-Commerce data")
+
 
 
