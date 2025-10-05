@@ -415,15 +415,15 @@ with tab_single:
         inputs = {}
         
         for i, feat in enumerate(TRAIN_FEATURES[:N_TOP]):
-    col = cols[i % 2]
-    friendly_name = get_friendly_name(feat)  # ✅ NEW: Get friendly name
-    inputs[feat] = col.number_input(
-        friendly_name,  # ✅ NEW: Display friendly name
-        value=0.0, 
-        step=0.1, 
-        format="%.4f",
-        help=f"{feat}\nFeature {i+1} of {len(TRAIN_FEATURES)}"  # ✅ Show technical name in tooltip
-    )
+            col = cols[i % 2]
+            friendly_name = get_friendly_name(feat)  # ✅ NEW: Get friendly name
+            inputs[feat] = col.number_input(
+                friendly_name,  # ✅ NEW: Display friendly name
+                value=0.0, 
+                step=0.1, 
+                format="%.4f",
+                help=f"{feat}\nFeature {i+1} of {len(TRAIN_FEATURES)}"  # ✅ Show technical name in tooltip
+            )
         
         st.markdown("---")
         st.markdown("**🔧 Advanced: JSON Override**")
@@ -775,4 +775,5 @@ with footer_col3:
 st.markdown("---")
 
 st.caption("Built with ❤️ using Streamlit | Trained on Olist Brazilian E-Commerce data")
+
 
