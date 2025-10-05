@@ -194,13 +194,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Get top features by importance
-if hasattr(base_model, "feature_importances_"):
-    importances = pd.Series(base_model.feature_importances_, index=TRAIN_FEATURES)
-    TOP_FEATURES = importances.nlargest(8).index.tolist()
-else:
-    # Fallback: use first 8 features
-    TOP_FEATURES = TRAIN_FEATURES[:8]
     
 # ----------------------- Sidebar -----------------------------
 with st.sidebar:
@@ -261,6 +254,14 @@ except Exception as e:
     st.error("Make sure you've run Step 7E to save the model and Step 8 for explainability artifacts.")
     st.stop()
 
+# Get top features by importance
+if hasattr(base_model, "feature_importances_"):
+    importances = pd.Series(base_model.feature_importances_, index=TRAIN_FEATURES)
+    TOP_FEATURES = importances.nlargest(8).index.tolist()
+else:
+    # Fallback: use first 8 features
+    TOP_FEATURES = TRAIN_FEATURES[:8]
+    
 # ----------------------- Tabs Layout -------------------------
 tab_pred, tab_single, tab_explain, tab_analytics = st.tabs([
     "📊 Batch Predictions", 
@@ -830,6 +831,7 @@ with footer_col3:
 st.markdown("---")
 
 st.caption("Built with ❤️ using Streamlit | Trained on Olist Brazilian E-Commerce data")
+
 
 
 
