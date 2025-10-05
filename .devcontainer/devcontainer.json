@@ -8,10 +8,12 @@
     },
     "codespaces": { "openFiles": ["README.md"] }
   },
-  // Keep this light—install via the debug run (pip will be invoked automatically on first run)
   "updateContentCommand": "python -V && pip -V",
   "portsAttributes": {
-    "8501": { "label": "Streamlit", "onAutoForward": "openPreview" }
+    "8501": { "label": "Streamlit - Primary", "onAutoForward": "openPreview" },
+    "8502": { "label": "Streamlit - NBA Performance", "onAutoForward": "openPreview" },
+    "8503": { "label": "Streamlit - Uber Pickups", "onAutoForward": "openPreview" },
+    "8504": { "label": "Streamlit - Supply Chain", "onAutoForward": "openPreview" }
   },
-  "forwardPorts": [8501]
+  "forwardPorts": [8501, 8502, 8503, 8504]
 }
