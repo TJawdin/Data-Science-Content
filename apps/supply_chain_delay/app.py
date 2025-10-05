@@ -29,7 +29,7 @@ st.set_page_config(
 )
 
 # ----------------------- Constants ---------------------------
-ARTIFACTS = Path("artifacts")
+ARTIFACTS = Path(__file__).parent / "artifacts"
 FEATURES_JSON = ARTIFACTS / "feature_names.json"
 GLOBAL_PI_PNG = ARTIFACTS / "global_importance_permutation.png"
 SHAP_SUMMARY_BEE = ARTIFACTS / "shap_summary_beeswarm.png"
@@ -229,10 +229,10 @@ with tab_pred:
         """)
     
     with col2:
-        sample_available = Path("data/sample_input.csv").exists()
+        sample_available = (Path(__file__).parent / "data/sample_input.csv").exists()
         if sample_available:
             st.info("📥 **Demo Available**")
-            with open("data/sample_input.csv", "rb") as f:
+            with open(Path(__file__).parent / "data/sample_input.csv", "rb") as f:
                 st.download_button(
                     "⬇️ Download Sample CSV",
                     data=f,
@@ -772,4 +772,5 @@ with footer_col3:
     st.caption(f"🎯 **Model:** {model_name.replace('model_', '').replace('.pkl', '').upper()}")
 
 st.markdown("---")
+
 st.caption("Built with ❤️ using Streamlit | Trained on Olist Brazilian E-Commerce data")
