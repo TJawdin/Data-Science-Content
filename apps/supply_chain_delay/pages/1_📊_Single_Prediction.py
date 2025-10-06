@@ -8,6 +8,10 @@ import pandas as pd
 import numpy as np
 import sys
 from pathlib import Path
+from utils.theme_adaptive import apply_adaptive_theme
+
+# Apply theme right after page config
+apply_adaptive_theme()
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
