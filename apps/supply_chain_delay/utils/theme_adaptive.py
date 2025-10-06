@@ -111,17 +111,10 @@ def apply_adaptive_theme():
             color: #FFFFFF !important;
         }
         
-                /* Download buttons - always visible with blue background */
-        div[data-testid="stDownloadButton"] button {
-            background-color: #0068C9 !important;
-            color: white !important;
-            border: 2px solid #0068C9 !important;
-            font-weight: 600 !important;
-            padding: 0.5rem 1rem !important;
-            margin: 0 !important;
-            vertical-align: middle !important;
+        /* Download buttons */
+        .stDownloadButton > button {
+            color: #FFFFFF !important;
         }
-          
     </style>
     """, unsafe_allow_html=True)
 
