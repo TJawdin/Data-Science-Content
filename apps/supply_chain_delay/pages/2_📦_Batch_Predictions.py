@@ -601,7 +601,7 @@ if uploaded_file is not None:
                             # Apply filters
                             filtered_df = predictions[
                                 (predictions['Prediction'].isin(filter_prediction)) &
-                                (predictions['Risk_Level'].isin(filter_risk))
+                                (predictions['risk_level'].isin(filter_risk))
                             ].sort_values(sort_by, ascending=False)
                             
                             # Display table
@@ -610,7 +610,7 @@ if uploaded_file is not None:
                                     lambda x: 'background-color: #FADBD8' if x == 'HIGH' else 
                                              ('background-color: #FEF5E7' if x == 'MEDIUM' else 
                                               ('background-color: #D5F4E6' if x == 'LOW' else '')),
-                                    subset=['Risk_Level']
+                                    subset=['risk_level']
                                 ),
                                 use_container_width=True,
                                 height=400
@@ -646,7 +646,7 @@ if uploaded_file is not None:
                                 else:
                                     return "Standard processing"
                             
-                            output_df['Recommendation'] = predictions['Risk_Level'].apply(get_recommendation)
+                            output_df['Recommendation'] = predictions['risk_level'].apply(get_recommendation)
                             
                             # Convert to CSV
                             output_csv = output_df.to_csv(index=False)
