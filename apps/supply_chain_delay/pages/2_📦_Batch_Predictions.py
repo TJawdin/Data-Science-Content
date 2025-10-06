@@ -163,6 +163,68 @@ def generate_synthetic_orders(n_orders=100):
     df = pd.DataFrame(orders)
     return df
 
+def create_risk_distribution(predictions_df):
+    """
+    Create a pie chart showing risk level distribution
+    
+    Parameters:
+    -----------
+    predictions_df : pd.DataFrame
+        DataFrame with prediction results including 'risk_level' column
+    
+    Returns:
+    --------
+    plotly.graph_objects.Figure : Pie chart figure
+    """
+    
+    colors_dict = get_adaptive_colors()
+    
+    # Count risk levels
+    risk_counts = predictions_df['risk_level'].value_counts()
+    
+    # Define colors for each risk level
+    color_map = {
+        'LOW': colors_dict['low_risk'],
+        'MEDIUM': colors_dict['medium_risk'],
+        'HIGH': colors_dict['high_risk']
+    }
+    
+    # Create pie chart
+    fig = go.Figure(data=[go.Pie(
+        labels=risk_counts.index,
+        values=risk_counts.values,
+        marker=dict(colors=[color_map.get(level, '#999999') for level in risk_counts.index]),
+        textinfo='label+percent+value',
+        textfont=dict(size=14),
+        hovertemplate='<b>%{label}</b><br>Count: %{value}<br>Percentage: %{percent}<extra></extra>'
+    )])
+    
+    fig.update_layout(
+        title={
+            'text': 'Risk Level Distribution',
+            'font': {'size': 16}
+        },
+        height=400,
+        plot_bgcolor=colors_dict['bg_transparent'],
+        paper_bgcolor=colors_dict['bg_transparent'],
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=-0.2,
+            xanchor="center",
+            x=0.5
+        )
+    )
+    
+    return fig
+
+# ============================================================================
+# Load Model
+# ============================================================================
+
+model = load_model()
+# ... rest of your code ...
 # ============================================================================
 # Load Model
 # ============================================================================
