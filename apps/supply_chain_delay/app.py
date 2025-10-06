@@ -1,16 +1,32 @@
 """
-Supply Chain Delay Prediction - Streamlit Application
-Author: Trecorrus Jordan
-Date: November 2025
-
-This application predicts whether e-commerce orders will be delivered late,
-enabling proactive intervention and resource optimization.
+Supply Chain Delay Risk Prediction App
+Main landing page with model overview and navigation
 """
 
 import streamlit as st
 import pandas as pd
-import json
+import sys
 from pathlib import Path
+
+# Add parent directory to path
+sys.path.insert(0, str(Path(__file__).parent))
+
+from utils.model_loader import load_model
+from utils.theme_adaptive import apply_adaptive_theme
+
+# ============================================================================
+# Page Configuration
+# ============================================================================
+
+st.set_page_config(
+    page_title="Supply Chain Delay Predictor",
+    page_icon="📦",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Apply adaptive theme
+apply_adaptive_theme()
 
 # ============================================================================
 # Load Model Metadata
