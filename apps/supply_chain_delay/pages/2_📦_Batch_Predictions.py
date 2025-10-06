@@ -1,25 +1,22 @@
 """
 Batch Predictions Page
-Upload CSV file and get predictions for multiple orders with interactive dashboard
+Upload CSV file and get predictions for multiple orders
 """
 
 import streamlit as st
 import pandas as pd
 import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
 import sys
 from pathlib import Path
-from io import BytesIO
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from utils.feature_engineering import calculate_features, get_feature_descriptions
+from utils.feature_engineering import calculate_features
 from utils.model_loader import load_model, predict_batch
-from utils.visualization import (
-    create_risk_distribution, 
-    create_batch_summary_dashboard,
-    create_feature_impact_bars
-)
+from utils.theme_adaptive import apply_adaptive_theme, get_adaptive_colors
 
 # Page config
 st.set_page_config(
@@ -27,21 +24,143 @@ st.set_page_config(
     page_icon="📦",
     layout="wide"
 )
-from utils.theme_adaptive import apply_adaptive_theme
 
-# Apply theme right after page config
+# Apply adaptive theme
 apply_adaptive_theme()
+
+# Get adaptive colors
+colors = get_adaptive_colors()
+
 # ============================================================================
 # Header
 # ============================================================================
 
-st.title("📦 Batch Order Predictions")
+st.title("📦 Batch Predictions")
 st.markdown("""
-Upload a CSV file containing multiple orders to get risk assessments for all of them at once.
-Perfect for daily operations and planning!
+Upload a CSV file containing multiple orders to get risk predictions for all of them at once.
+Perfect for daily order processing and risk monitoring!
 """)
 
 st.markdown("---")
+
+# ============================================================================
+# Synthetic Data Generator Function
+# ============================================================================
+
+def generate_synthetic_orders(n_orders=100):
+    """
+    Generate synthetic order data with realistic distributions
+    Includes mix of low, medium, and high risk orders
+    
+    Parameters:
+    -----------
+    n_orders : int
+        Number of orders to generate
+    
+    Returns:
+    --------
+    pd.DataFrame : Synthetic order data
+    """
+    
+    np.random.seed(None)  # Random seed for variety
+    
+    orders = []
+    
+    # Target distribution: 40% low, 40% medium, 20% high risk
+    risk_categories = np.random.choice(
+        ['low', 'medium', 'high'],
+        size=n_orders,
+        p=[0.4, 0.4, 0.2]
+    )
+    
+    for i, risk_cat in enumerate(risk_categories):
+        
+        if risk_cat == 'low':
+            # LOW RISK: Simple, local, standard timeline
+            num_items = np.random.randint(1, 3)
+            num_sellers = 1
+            total_order_value = np.random.uniform(50, 200)
+            total_shipping_cost = np.random.uniform(5, 15)
+            total_weight_g = np.random.randint(200, 1500)
+            avg_length_cm = np.random.uniform(15, 30)
+            avg_height_cm = np.random.uniform(10, 20)
+            avg_width_cm = np.random.uniform(8, 15)
+            avg_shipping_distance_km = np.random.randint(20, 150)
+            is_cross_state = 0
+            estimated_days = np.random.randint(10, 20)
+            order_weekday = np.random.choice([0, 1, 2, 3, 4])  # Weekdays
+            order_month = np.random.choice([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])  # Non-holiday
+            order_hour = np.random.randint(8, 18)  # Business hours
+            
+        elif risk_cat == 'medium':
+            # MEDIUM RISK: Moderate complexity/distance
+            num_items = np.random.randint(2, 5)
+            num_sellers = np.random.choice([1, 2], p=[0.6, 0.4])
+            total_order_value = np.random.uniform(150, 400)
+            total_shipping_cost = np.random.uniform(15, 40)
+            total_weight_g = np.random.randint(1000, 4000)
+            avg_length_cm = np.random.uniform(25, 45)
+            avg_height_cm = np.random.uniform(18, 30)
+            avg_width_cm = np.random.uniform(12, 25)
+            avg_shipping_distance_km = np.random.randint(150, 800)
+            is_cross_state = np.random.choice([0, 1], p=[0.3, 0.7])
+            estimated_days = np.random.randint(7, 15)
+            order_weekday = np.random.randint(0, 7)  # Any day
+            order_month = np.random.randint(1, 13)  # Any month
+            order_hour = np.random.randint(6, 22)
+            
+        else:  # high risk
+            # HIGH RISK: Complex, remote, rushed
+            num_items = np.random.randint(4, 10)
+            num_sellers = np.random.randint(2, 5)
+            total_order_value = np.random.uniform(300, 800)
+            total_shipping_cost = np.random.uniform(40, 120)
+            total_weight_g = np.random.randint(3000, 10000)
+            avg_length_cm = np.random.uniform(40, 70)
+            avg_height_cm = np.random.uniform(30, 50)
+            avg_width_cm = np.random.uniform(20, 40)
+            avg_shipping_distance_km = np.random.randint(800, 2500)
+            is_cross_state = 1
+            estimated_days = np.random.randint(3, 8)  # Rush order
+            order_weekday = np.random.choice([5, 6])  # Weekend
+            order_month = np.random.choice([11, 12])  # Holiday season
+            order_hour = np.random.choice(list(range(0, 6)) + list(range(20, 24)))  # Off hours
+        
+        # Calculate derived fields
+        is_weekend_order = 1 if order_weekday >= 5 else 0
+        is_holiday_season = 1 if order_month in [11, 12] else 0
+        
+        order = {
+            'order_id': f'ORDER_{i+1:05d}',
+            'num_items': num_items,
+            'num_sellers': num_sellers,
+            'num_products': num_items,
+            'total_order_value': round(total_order_value, 2),
+            'avg_item_price': round(total_order_value / num_items, 2),
+            'max_item_price': round(total_order_value / num_items * 1.2, 2),
+            'total_shipping_cost': round(total_shipping_cost, 2),
+            'avg_shipping_cost': round(total_shipping_cost / num_items, 2),
+            'total_weight_g': int(total_weight_g),
+            'avg_weight_g': int(total_weight_g / num_items),
+            'max_weight_g': int(total_weight_g / num_items * 1.3),
+            'avg_length_cm': round(avg_length_cm, 1),
+            'avg_height_cm': round(avg_height_cm, 1),
+            'avg_width_cm': round(avg_width_cm, 1),
+            'avg_shipping_distance_km': int(avg_shipping_distance_km),
+            'max_shipping_distance_km': int(avg_shipping_distance_km * 1.1),
+            'is_cross_state': is_cross_state,
+            'order_weekday': order_weekday,
+            'order_month': order_month,
+            'order_hour': order_hour,
+            'is_weekend_order': is_weekend_order,
+            'is_holiday_season': is_holiday_season,
+            'estimated_days': estimated_days
+        }
+        
+        orders.append(order)
+    
+    df = pd.DataFrame(orders)
+    return df
 
 # ============================================================================
 # Load Model
@@ -50,12 +169,71 @@ st.markdown("---")
 model = load_model()
 
 if model is None:
-    st.error("""
-    ⚠️ **Model Not Found**
-    
-    Please copy your trained model file to: `apps/supply_chain_delay/artifacts/`
-    """)
+    st.error("⚠️ Model not found. Please copy your trained model to the artifacts folder.")
     st.stop()
+
+# ============================================================================
+# Synthetic Data Generator
+# ============================================================================
+
+st.markdown("## 🎲 Generate Test Data")
+
+col1, col2 = st.columns([3, 1])
+
+with col1:
+    st.info("""
+    **Don't have a CSV file?** Generate synthetic test data with realistic order characteristics!
+    
+    The generated data will include a mix of:
+    - 🟢 **Low Risk Orders** (~40%) - Simple, local, standard timeline
+    - 🟡 **Medium Risk Orders** (~40%) - Moderate complexity/distance
+    - 🔴 **High Risk Orders** (~20%) - Complex, remote, rushed
+    """)
+
+with col2:
+    num_orders = st.number_input(
+        "Number of Orders",
+        min_value=10,
+        max_value=1000,
+        value=100,
+        step=10,
+        help="How many test orders to generate"
+    )
+    
+    if st.button("🎲 Generate Test Data", type="primary", use_container_width=True):
+        
+        with st.spinner(f"Generating {num_orders} synthetic orders..."):
+            
+            # Generate synthetic data
+            synthetic_data = generate_synthetic_orders(num_orders)
+            
+            # Convert to CSV
+            csv = synthetic_data.to_csv(index=False)
+            
+            # Success message
+            st.success(f"✅ Generated {num_orders} orders with mixed risk levels!")
+            
+            # Show preview
+            with st.expander("📊 Preview Generated Data (first 10 rows)"):
+                st.dataframe(synthetic_data.head(10), use_container_width=True)
+            
+            # Download button
+            st.download_button(
+                label="📥 Download Test Data (CSV)",
+                data=csv,
+                file_name=f"synthetic_orders_{num_orders}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True,
+                type="primary"
+            )
+            
+            st.info("""
+            **Next Step:** Use the file uploader below to upload this CSV and test batch predictions!
+            """)
+
+st.markdown("---")
+
+# REST OF YOUR BATCH PREDICTIONS CODE CONTINUES HERE...
 
 # ============================================================================
 # CSV Template Download
