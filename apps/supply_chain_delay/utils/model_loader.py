@@ -1,46 +1,41 @@
 """
-Model Loading and Prediction Functions
+Model Loader Utility
+Handles loading the trained model and making predictions
 """
 
-import joblib
-import numpy as np
-import pandas as pd
-from pathlib import Path
 import streamlit as st
+import pandas as pd
+import pickle
+from pathlib import Path
+
+# Model path
+MODEL_PATH = Path(__file__).parent.parent / 'artifacts' / 'best_model.pkl'
 
 @st.cache_resource
 def load_model():
     """
-    Load the trained model from artifacts folder
-    Uses caching to load only once
-    """
-    try:
-        # Try to find the best model
-        artifacts_dir = Path(__file__).parent.parent / "artifacts"
-        
-        # Look for model files
-        model_files = list(artifacts_dir.glob("best_model_*.pkl"))
-        
-        if not model_files:
-            # Fallback: look for any model file
-            model_files = list(artifacts_dir.glob("model_*.pkl"))
-        
-        if not model_files:
-            st.error("""
-            ⚠️ No model file found in artifacts/ folder.
-            
-            Please copy your trained model from the notebook to:
-            `apps/supply_chain_delay/artifacts/best_model_*.pkl`
-            """)
-            return None
-        
-        # Load the first model found
-        model_path = model_files[0]
-        model = joblib.load(model_path)
-        
-        st.success(f"✅ Model loaded: {model_path.name}")
-        return model
+    Load the trained XGBoost model from artifacts folder
     
+    Returns:
+    --------
+    model : trained model or None if not found
+    """
+    
+    try:
+        with open(MODEL_PATH, 'rb') as f:
+            model = pickle.load(f)
+        
+        # Debug info
+        print(f"✅ Model loaded successfully from: {MODEL_PATH}")
+        print(f"   Model type: {type(model)}")
+        
+        return model
+        
+    except FileNotFoundError:
+        st.error(f"❌ Model file not found at: {MODEL_PATH}")
+        st.info("Please ensure your trained model is saved as 'best_model.pkl' in the artifacts folder.")
+        return None
+        
     except Exception as e:
         st.error(f"❌ Error loading model: {str(e)}")
         return None
@@ -48,139 +43,99 @@ def load_model():
 
 def predict_single(model, features_df):
     """
-    Make prediction for a single order
+    Make a prediction for a single order
     
     Parameters:
     -----------
     model : trained model
-    features_df : pd.DataFrame with 30 features
+        The loaded XGBoost model
+    features_df : pd.DataFrame
+        Feature DataFrame for one order
     
     Returns:
     --------
-    dict with prediction, probability, and risk score
+    dict : Prediction results with risk score and level
     """
+    
     try:
-        # Get prediction
+        # Make prediction
         prediction = model.predict(features_df)[0]
-        
-        # Get probability
-        if hasattr(model, 'predict_proba'):
-            probabilities = model.predict_proba(features_df)[0]
-            prob_late = probabilities[1]
-        else:
-            # Fallback if no predict_proba
-            prob_late = prediction
+        probability = model.predict_proba(features_df)[0, 1]
         
         # Calculate risk score (0-100)
-        risk_score = int(prob_late * 100)
+        risk_score = int(probability * 100)
         
         # Determine risk level
         if risk_score < 30:
-            risk_level = "LOW"
-            risk_color = "green"
+            risk_level = 'LOW'
         elif risk_score < 70:
-            risk_level = "MEDIUM"
-            risk_color = "orange"
+            risk_level = 'MEDIUM'
         else:
-            risk_level = "HIGH"
-            risk_color = "red"
+            risk_level = 'HIGH'
         
+        # Return results
         return {
             'prediction': int(prediction),
             'prediction_label': 'Late' if prediction == 1 else 'On-Time',
-            'probability': float(prob_late),
+            'probability': float(probability),
             'risk_score': risk_score,
-            'risk_level': risk_level,
-            'risk_color': risk_color
+            'risk_level': risk_level
         }
-    
+        
     except Exception as e:
-        st.error(f"❌ Prediction error: {str(e)}")
+        st.error(f"Prediction error: {str(e)}")
         return None
 
 
-def predict_batch(model, features_df):
+def predict_batch(model, features_list):
     """
-    Make predictions for multiple orders
+    Make predictions for a batch of orders
     
     Parameters:
     -----------
     model : trained model
-    features_df : pd.DataFrame with N rows × 30 features
+        The loaded XGBoost model
+    features_list : list of pd.DataFrame
+        List of feature DataFrames for each order
     
     Returns:
     --------
-    pd.DataFrame with predictions and risk scores
+    pd.DataFrame : Predictions with risk scores and levels
     """
+    
     try:
-        # Get predictions
-        predictions = model.predict(features_df)
+        # Combine all features into one DataFrame
+        all_features = pd.concat(features_list, ignore_index=True)
         
-        # Get probabilities
-        if hasattr(model, 'predict_proba'):
-            probabilities = model.predict_proba(features_df)
-            prob_late = probabilities[:, 1]
-        else:
-            prob_late = predictions
+        # Make predictions
+        predictions = model.predict(all_features)
+        probabilities = model.predict_proba(all_features)[:, 1]
         
-        # Create results dataframe
+        # Calculate risk scores
+        risk_scores = (probabilities * 100).astype(int)
+        
+        # Determine risk levels
+        def get_risk_level(score):
+            if score < 30:
+                return 'LOW'
+            elif score < 70:
+                return 'MEDIUM'
+            else:
+                return 'HIGH'
+        
+        risk_levels = [get_risk_level(score) for score in risk_scores]
+        
+        # Create results DataFrame
         results = pd.DataFrame({
-            'Prediction': ['Late' if p == 1 else 'On-Time' for p in predictions],
-            'Late_Probability': prob_late,
-            'Risk_Score': (prob_late * 100).astype(int),
-            'Risk_Level': pd.cut(
-                prob_late * 100,
-                bins=[0, 30, 70, 100],
-                labels=['LOW', 'MEDIUM', 'HIGH']
-            )
+            'prediction': predictions,
+            'prediction_label': ['Late' if p == 1 else 'On-Time' for p in predictions],
+            'probability': probabilities,
+            'risk_score': risk_scores,
+            'risk_level': risk_levels
         })
         
         return results
-    
+        
     except Exception as e:
-        st.error(f"❌ Batch prediction error: {str(e)}")
-        return None
-
-
-def get_feature_importance(model, feature_names):
-    """
-    Extract feature importance from model
-    
-    Parameters:
-    -----------
-    model : trained model
-    feature_names : list of feature names
-    
-    Returns:
-    --------
-    pd.DataFrame with feature importance sorted
-    """
-    try:
-        # Handle pipeline models (Logistic Regression)
-        if hasattr(model, 'named_steps'):
-            actual_model = model.named_steps.get('clf', model)
-        else:
-            actual_model = model
-        
-        # Get feature importance
-        if hasattr(actual_model, 'feature_importances_'):
-            # Tree-based models
-            importances = actual_model.feature_importances_
-        elif hasattr(actual_model, 'coef_'):
-            # Linear models
-            importances = np.abs(actual_model.coef_[0])
-        else:
-            st.warning("⚠️ Model does not support feature importance extraction")
-            return None
-        
-        # Create dataframe
-        importance_df = pd.DataFrame({
-            'Feature': feature_names,
-            'Importance': importances
-        }).sort_values('Importance', ascending=False)
-        
-        return importance_df
-    
-    except Exception as e:
-        st.error(f"❌ Error extracting feature importance: {str(e)}")
+        st.error(f"Batch prediction error: {str(e)}")
         return None
