@@ -11,12 +11,18 @@ import streamlit as st
 from utils.theme_adaptive import get_adaptive_colors, configure_plotly_figure
 
 # ============================================================================
-# Risk Gauge (Speedometer) - FIXED TEXT CUTOFF
+# Risk Gauge (Speedometer) - UPDATED THRESHOLDS
 # ============================================================================
 
 def create_risk_gauge(risk_score, risk_level):
     """
     Create an interactive gauge chart showing risk score
+    Aligned with optimized model threshold (18.44%)
+    
+    Risk Levels:
+    - LOW: 0-9%
+    - MEDIUM: 10-25%
+    - HIGH: 26%+
     """
     
     colors = get_adaptive_colors()
@@ -37,25 +43,25 @@ def create_risk_gauge(risk_score, risk_level):
             'text': f"<b>Late Delivery Risk</b><br><span style='font-size:0.7em;color:{bar_color}'>{risk_level} RISK</span>", 
             'font': {'size': 20}
         },
-        delta={'reference': 50, 'increasing': {'color': colors['high_risk']}, 'decreasing': {'color': colors['low_risk']}},
+        delta={'reference': 18, 'increasing': {'color': colors['high_risk']}, 'decreasing': {'color': colors['low_risk']}},
         number={'font': {'size': 50}},
         gauge={
             'axis': {
                 'range': [None, 100], 
                 'tickwidth': 2, 
                 'tickcolor': "gray",
-                'tickmode': 'linear',
-                'tick0': 0,
-                'dtick': 20
+                'tickmode': 'array',
+                'tickvals': [0, 10, 26, 50, 75, 100],
+                'ticktext': ['0', '10', '26', '50', '75', '100']
             },
             'bar': {'color': bar_color, 'thickness': 0.75},
             'bgcolor': colors['bg_transparent'],
             'borderwidth': 2,
             'bordercolor': "gray",
             'steps': [
-                {'range': [0, 30], 'color': 'rgba(46, 204, 113, 0.2)'},
-                {'range': [30, 70], 'color': 'rgba(243, 156, 18, 0.2)'},
-                {'range': [70, 100], 'color': 'rgba(231, 76, 60, 0.2)'}
+                {'range': [0, 10], 'color': 'rgba(46, 204, 113, 0.2)'},     # GREEN: LOW (0-9%)
+                {'range': [10, 26], 'color': 'rgba(243, 156, 18, 0.2)'},    # ORANGE: MEDIUM (10-25%)
+                {'range': [26, 100], 'color': 'rgba(231, 76, 60, 0.2)'}     # RED: HIGH (26%+)
             ],
             'threshold': {
                 'line': {'color': "black", 'width': 4},
@@ -185,12 +191,13 @@ def create_correlation_heatmap(features_df, feature_names_mapping=None):
 
 
 # ============================================================================
-# Risk Distribution Histogram
+# Risk Distribution Histogram - UPDATED THRESHOLDS
 # ============================================================================
 
 def create_risk_distribution(risk_scores):
     """
     Create histogram showing distribution of risk scores
+    Aligned with optimized model threshold (18.44%)
     
     Parameters:
     -----------
@@ -205,9 +212,11 @@ def create_risk_distribution(risk_scores):
         marker=dict(
             color=risk_scores,
             colorscale=[
-                [0, '#2ECC71'],
-                [0.3, '#F39C12'],
-                [0.7, '#E74C3C']
+                [0, '#2ECC71'],      # Green at 0%
+                [0.10, '#2ECC71'],   # Green until 10%
+                [0.26, '#F39C12'],   # Orange from 10-26%
+                [0.26, '#E74C3C'],   # Red from 26%+
+                [1, '#E74C3C']       # Red at 100%
             ],
             line=dict(color='white', width=1)
         ),
@@ -226,11 +235,16 @@ def create_risk_distribution(risk_scores):
         margin=dict(l=50, r=50, t=80, b=50)
     )
     
-    # Add vertical lines for risk thresholds
-    fig.add_vline(x=30, line_dash="dash", line_color="green", 
-                  annotation_text="Low/Medium", annotation_position="top")
-    fig.add_vline(x=70, line_dash="dash", line_color="red", 
-                  annotation_text="Medium/High", annotation_position="top")
+    # Add vertical lines for risk thresholds - UPDATED TO MATCH MODEL
+    fig.add_vline(x=10, line_dash="dash", line_color="green", line_width=2,
+                  annotation_text="LOW/MEDIUM (10%)", annotation_position="top right")
+    fig.add_vline(x=26, line_dash="dash", line_color="red", line_width=2,
+                  annotation_text="MEDIUM/HIGH (26%)", annotation_position="top left")
+    
+    # Add shaded regions
+    fig.add_vrect(x0=0, x1=10, fillcolor="green", opacity=0.1, line_width=0)
+    fig.add_vrect(x0=10, x1=26, fillcolor="orange", opacity=0.1, line_width=0)
+    fig.add_vrect(x0=26, x1=100, fillcolor="red", opacity=0.1, line_width=0)
     
     return fig
 
