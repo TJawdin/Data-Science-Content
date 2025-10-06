@@ -1,0 +1,14 @@
+Model: XGBoost
+Threshold: 0.1844
+
+Hyperparameters:
+  learning_rate: 0.011837834645943563
+  n_estimators: 742
+  max_depth: 11
+  min_child_weight: 7
+  gamma: 2.9835553651468465
+  subsample: 0.7199026612653248
+  colsample_bytree: 0.6890998135079909
+  reg_alpha: 3.318206950758183
+  reg_lambda: 2.7552181022382767
+  scale_pos_weight: 1.3881486719199547
