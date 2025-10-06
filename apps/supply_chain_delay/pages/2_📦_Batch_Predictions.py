@@ -497,7 +497,7 @@ if uploaded_file is not None:
                             st.metric("Predicted Late", f"{late_count}", f"{late_pct:.1f}%")
                         
                         with col3:
-                            high_risk = (predictions['Risk_Level'] == 'HIGH').sum()
+                            high_risk = (predictions['risk_level'] == 'HIGH').sum()
                             st.metric("High Risk Orders", f"{high_risk}", 
                                      delta="Needs Attention" if high_risk > 0 else "All Clear",
                                      delta_color="inverse" if high_risk > 0 else "normal")
@@ -535,7 +535,7 @@ if uploaded_file is not None:
                             
                             with col2:
                                 # Risk level bar chart
-                                risk_counts = predictions['Risk_Level'].value_counts()
+                                risk_counts = predictions['risk_level'].value_counts()
                                 risk_order = ['LOW', 'MEDIUM', 'HIGH']
                                 risk_counts = risk_counts.reindex(risk_order, fill_value=0)
                                 
@@ -661,7 +661,7 @@ if uploaded_file is not None:
                         
                         with col2:
                             # Download high-risk orders only
-                            high_risk_df = output_df[predictions['Risk_Level'] == 'HIGH']
+                            high_risk_df = output_df[predictions['risk_level'] == 'HIGH']
                             
                             if len(high_risk_df) > 0:
                                 high_risk_csv = high_risk_df.to_csv(index=False)
