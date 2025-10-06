@@ -1,7 +1,7 @@
 """
 Supply Chain Delay Prediction - Streamlit Application
 Author: Trecorrus Jordan
-Date: October 2025
+Date: November 2025
 
 This application predicts whether e-commerce orders will be delivered late,
 enabling proactive intervention and resource optimization.
@@ -225,7 +225,7 @@ col1, col2 = st.columns(2)
 with col1:
     st.info("""
     **Project:** Data Science Capstone - Supply Chain Delay Prediction  
-    **Author:** Trecorrus Jordan 
+    **Author:** Trecorrus Jordan   
     **Date:** November 2025  
     **Dataset:** Olist Brazilian E-Commerce (100k+ orders)
     """)
