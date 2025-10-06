@@ -241,11 +241,6 @@ with col1:
     
     st.markdown("### 📊 Order Details")
     
-    details_data = {
-        'Attribute': [],
-        'Value': []
-    }
-    
     # Show key details in a nice format
     key_details = {
         'Number of Items': scenario['data']['num_items'],
@@ -254,40 +249,46 @@ with col1:
         'Total Shipping Cost': f"${scenario['data']['total_shipping_cost']:.2f}",
         'Total Weight': f"{scenario['data']['total_weight_g']}g",
         'Shipping Distance': f"{scenario['data']['avg_shipping_distance_km']}km",
-        'Cross-State': 'Yes' if scenario['data']['is_cross_state'] else 'No',
-        'Weekend Order': 'Yes' if scenario['data']['is_weekend_order'] else 'No',
-        'Holiday Season': 'Yes' if scenario['data']['is_holiday_season'] else 'No',
+        'Cross-State': 'Yes' if scenario['data'].get('is_cross_state', 0) == 1 else 'No',
+        'Weekend Order': 'Yes' if scenario['data'].get('is_weekend_order', 0) == 1 else 'No',
+        'Holiday Season': 'Yes' if scenario['data'].get('is_holiday_season', 0) == 1 else 'No',
         'Estimated Delivery': f"{scenario['data']['estimated_days']} days"
     }
     
-    for attr, val in key_details.items():
-        details_data['Attribute'].append(attr)
-        details_data['Value'].append(val)
+    # Create table
+    details_df = pd.DataFrame({
+        'Attribute': list(key_details.keys()),
+        'Value': list(key_details.values())
+    })
     
-    st.table(pd.DataFrame(details_data))
+    st.table(details_df)
 
 with col2:
     # Make prediction
     with st.spinner("Calculating risk..."):
-        features_df = calculate_features(scenario['data'])
-        result = predict_single(model, features_df)
-        
-        if result:
-            # Display risk gauge
-            fig = create_risk_gauge(result['risk_score'], result['risk_level'])
-            st.plotly_chart(fig, use_container_width=True)
+        try:
+            features_df = calculate_features(scenario['data'])
+            result = predict_single(model, features_df)
             
-            # Metrics
-            col_a, col_b, col_c = st.columns(3)
-            
-            with col_a:
-                st.metric("Prediction", result['prediction_label'])
-            
-            with col_b:
-                st.metric("Risk Score", f"{result['risk_score']}/100")
-            
-            with col_c:
-                st.metric("Risk Level", result['risk_level'])
+            if result:
+                # Display risk gauge
+                fig = create_risk_gauge(result['risk_score'], result['risk_level'])
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Metrics
+                col_a, col_b, col_c = st.columns(3)
+                
+                with col_a:
+                    st.metric("Prediction", result['prediction_label'])
+                
+                with col_b:
+                    st.metric("Risk Score", f"{result['risk_score']}/100")
+                
+                with col_c:
+                    st.metric("Risk Level", result['risk_level'])
+        except Exception as e:
+            st.error(f"❌ Prediction error: {str(e)}")
+            result = None
 
 st.markdown("---")
 
@@ -335,21 +336,25 @@ st.markdown("---")
 # ============================================================================
 
 with st.expander("🔍 View Detailed Feature Values"):
-    feature_descriptions = get_feature_descriptions()
-    
-    feature_display = []
-    for col in features_df.columns:
-        feature_display.append({
-            'Feature': feature_descriptions.get(col, col),
-            'Technical Name': col,
-            'Value': features_df[col].values[0]
-        })
-    
-    st.dataframe(
-        pd.DataFrame(feature_display),
-        use_container_width=True,
-        height=400
-    )
+    try:
+        feature_descriptions = get_feature_descriptions()
+        
+        if 'features_df' in locals():
+            feature_display = []
+            for col in features_df.columns:
+                feature_display.append({
+                    'Feature': feature_descriptions.get(col, col),
+                    'Technical Name': col,
+                    'Value': features_df[col].values[0]
+                })
+            
+            st.dataframe(
+                pd.DataFrame(feature_display),
+                use_container_width=True,
+                height=400
+            )
+    except Exception as e:
+        st.error(f"Could not display feature breakdown: {str(e)}")
 
 # ============================================================================
 # Sidebar
