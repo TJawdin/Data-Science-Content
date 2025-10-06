@@ -1,6 +1,6 @@
 """
 Feature Engineering Functions
-Matches the 30 domain features from the notebook
+Matches the EXACT 29 features from the trained model
 """
 
 import pandas as pd
@@ -26,7 +26,8 @@ def calculate_distance_km(lat1, lon1, lat2, lon2):
 
 def calculate_features(order_data):
     """
-    Calculate all 30 domain features from raw order data
+    Calculate all 29 domain features from raw order data
+    MUST match exact order from trained model
     
     Parameters:
     -----------
@@ -35,7 +36,7 @@ def calculate_features(order_data):
     
     Returns:
     --------
-    pd.DataFrame with 30 features matching notebook EXACT order
+    pd.DataFrame with 29 features in EXACT model order
     """
     
     # Convert to DataFrame if dict
@@ -44,54 +45,60 @@ def calculate_features(order_data):
     else:
         df = order_data.copy()
     
-    # Create features dictionary (ensures no duplicates)
+    # Create features dictionary
     features_dict = {}
     
     # ========== Order Complexity Features ==========
-    features_dict['num_items'] = df.get('num_items', pd.Series([1])).values[0]
-    features_dict['num_sellers'] = df.get('num_sellers', pd.Series([1])).values[0]
+    num_items = df.get('num_items', pd.Series([1])).values[0]
+    num_sellers = df.get('num_sellers', pd.Series([1])).values[0]
+    
+    features_dict['num_items'] = num_items
+    features_dict['num_sellers'] = num_sellers
     features_dict['num_products'] = df.get('num_products', pd.Series([1])).values[0]
-    features_dict['is_multi_seller'] = int(features_dict['num_sellers'] > 1)
-    features_dict['is_multi_item'] = int(features_dict['num_items'] > 1)
+    features_dict['is_multi_seller'] = int(num_sellers > 1)
+    features_dict['is_multi_item'] = int(num_items > 1)
     
     # ========== Financial Features ==========
-    features_dict['total_order_value'] = df.get('total_order_value', pd.Series([0])).values[0]
+    total_order_value = df.get('total_order_value', pd.Series([0])).values[0]
+    
+    features_dict['total_order_value'] = total_order_value
     features_dict['avg_item_price'] = df.get('avg_item_price', pd.Series([0])).values[0]
     features_dict['max_item_price'] = df.get('max_item_price', pd.Series([0])).values[0]
     features_dict['total_shipping_cost'] = df.get('total_shipping_cost', pd.Series([0])).values[0]
     features_dict['avg_shipping_cost'] = df.get('avg_shipping_cost', pd.Series([0])).values[0]
     
+    # ========== Derived Ratios (CRITICAL ORDER) ==========
+    total_weight_g = df.get('total_weight_g', pd.Series([0])).values[0]
+    avg_shipping_distance_km = df.get('avg_shipping_distance_km', pd.Series([500])).values[0]
+    
     # Weight to price ratio
-    features_dict['weight_to_price_ratio'] = (
-        df.get('total_weight_g', pd.Series([0])).values[0] / 
-        (features_dict['total_order_value'] + 1)
+    features_dict['weight_to_price_ratio'] = total_weight_g / (total_order_value + 1)
+    
+    # Shipping cost per km (RIGHT AFTER weight_to_price_ratio!)
+    features_dict['shipping_cost_per_km'] = (
+        features_dict['total_shipping_cost'] / (avg_shipping_distance_km + 1)
     )
     
     # ========== Physical Features ==========
-    features_dict['total_weight_g'] = df.get('total_weight_g', pd.Series([0])).values[0]
+    features_dict['total_weight_g'] = total_weight_g
     features_dict['avg_weight_g'] = df.get('avg_weight_g', pd.Series([0])).values[0]
     features_dict['max_weight_g'] = df.get('max_weight_g', pd.Series([0])).values[0]
-    features_dict['avg_length_cm'] = df.get('avg_length_cm', pd.Series([0])).values[0]
-    features_dict['avg_height_cm'] = df.get('avg_height_cm', pd.Series([0])).values[0]
-    features_dict['avg_width_cm'] = df.get('avg_width_cm', pd.Series([0])).values[0]
+    
+    avg_length_cm = df.get('avg_length_cm', pd.Series([0])).values[0]
+    avg_height_cm = df.get('avg_height_cm', pd.Series([0])).values[0]
+    avg_width_cm = df.get('avg_width_cm', pd.Series([0])).values[0]
+    
+    features_dict['avg_length_cm'] = avg_length_cm
+    features_dict['avg_height_cm'] = avg_height_cm
+    features_dict['avg_width_cm'] = avg_width_cm
     
     # Product volume
-    features_dict['avg_product_volume_cm3'] = (
-        features_dict['avg_length_cm'] * 
-        features_dict['avg_height_cm'] * 
-        features_dict['avg_width_cm']
-    )
+    features_dict['avg_product_volume_cm3'] = avg_length_cm * avg_height_cm * avg_width_cm
     
     # ========== Geographic Features ==========
-    features_dict['avg_shipping_distance_km'] = df.get('avg_shipping_distance_km', pd.Series([500])).values[0]
+    features_dict['avg_shipping_distance_km'] = avg_shipping_distance_km
     features_dict['max_shipping_distance_km'] = df.get('max_shipping_distance_km', pd.Series([500])).values[0]
     features_dict['is_cross_state'] = df.get('is_cross_state', pd.Series([0])).values[0]
-    
-    # Shipping cost per km
-    features_dict['shipping_cost_per_km'] = (
-        features_dict['total_shipping_cost'] / 
-        (features_dict['avg_shipping_distance_km'] + 1)
-    )
     
     # ========== Temporal Features ==========
     features_dict['order_weekday'] = df.get('order_weekday', pd.Series([2])).values[0]
@@ -101,11 +108,11 @@ def calculate_features(order_data):
     features_dict['is_holiday_season'] = df.get('is_holiday_season', pd.Series([0])).values[0]
     
     # ========== Time Estimation Features ==========
-    features_dict['estimated_days'] = df.get('estimated_days', pd.Series([10])).values[0]
-    features_dict['is_rush_order'] = int(features_dict['estimated_days'] < 7)
+    estimated_days = df.get('estimated_days', pd.Series([10])).values[0]
+    features_dict['is_rush_order'] = int(estimated_days < 7)
+    features_dict['estimated_days'] = estimated_days
     
-    # CRITICAL: Create DataFrame with features in EXACT notebook order
-    # This order MUST match the order used during model training
+    # CRITICAL: Create DataFrame with EXACT model order (29 features)
     feature_order = [
         'num_items',
         'num_sellers',
@@ -118,7 +125,8 @@ def calculate_features(order_data):
         'total_shipping_cost',
         'avg_shipping_cost',
         'weight_to_price_ratio',
-        'total_weight_g',
+        'shipping_cost_per_km',           # Position 12 (model expects it here!)
+        'total_weight_g',                 # Position 13
         'avg_weight_g',
         'max_weight_g',
         'avg_length_cm',
@@ -128,7 +136,6 @@ def calculate_features(order_data):
         'avg_shipping_distance_km',
         'max_shipping_distance_km',
         'is_cross_state',
-        'shipping_cost_per_km',
         'order_weekday',
         'order_month',
         'order_hour',
@@ -147,6 +154,9 @@ def calculate_features(order_data):
     # Fill any NaN with 0
     features_df = features_df.fillna(0)
     
+    # VERIFY: Should have exactly 29 features
+    assert len(features_df.columns) == 29, f"Expected 29 features, got {len(features_df.columns)}"
+    
     return features_df
 
 
@@ -164,6 +174,7 @@ def get_feature_descriptions():
         'total_shipping_cost': 'Total Shipping Cost ($)',
         'avg_shipping_cost': 'Average Shipping Cost ($)',
         'weight_to_price_ratio': 'Weight/Price Ratio',
+        'shipping_cost_per_km': 'Shipping Cost per KM ($)',
         'total_weight_g': 'Total Weight (grams)',
         'avg_weight_g': 'Average Weight (grams)',
         'max_weight_g': 'Heaviest Item (grams)',
@@ -174,7 +185,6 @@ def get_feature_descriptions():
         'avg_shipping_distance_km': 'Shipping Distance (km)',
         'max_shipping_distance_km': 'Max Shipping Distance (km)',
         'is_cross_state': 'Cross-State Shipping (Yes/No)',
-        'shipping_cost_per_km': 'Shipping Cost per KM ($)',
         'order_weekday': 'Order Day of Week (0=Mon, 6=Sun)',
         'order_month': 'Order Month (1-12)',
         'order_hour': 'Order Hour (0-23)',
