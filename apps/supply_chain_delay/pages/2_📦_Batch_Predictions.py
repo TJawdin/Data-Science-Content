@@ -557,8 +557,8 @@ if uploaded_file is not None:
                         with tab2:
                             st.markdown("### 📈 Risk Score Analysis")
                             
-                            # Risk distribution histogram
-                            fig_hist = create_risk_distribution(predictions['Risk_Score'])
+                           # Risk distribution histogram
+                            fig_hist = create_risk_distribution(predictions)  # Pass full DataFrame, not just Risk_Score column
                             st.plotly_chart(fig_hist, use_container_width=True)
                             
                             # Risk statistics
