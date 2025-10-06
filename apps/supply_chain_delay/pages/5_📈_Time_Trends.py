@@ -16,6 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.model_loader import load_model
+from utils.theme_adaptive import apply_adaptive_theme, get_adaptive_colors
 
 # Page config
 st.set_page_config(
@@ -23,10 +24,13 @@ st.set_page_config(
     page_icon="📈",
     layout="wide"
 )
-from utils.theme_adaptive import apply_adaptive_theme
 
-# Apply theme right after page config
+# Apply adaptive theme
 apply_adaptive_theme()
+
+# Get adaptive colors
+colors = get_adaptive_colors()
+
 # ============================================================================
 # Header
 # ============================================================================
@@ -40,7 +44,7 @@ Identify peak risk hours, days, and seasons to optimize operations!
 st.markdown("---")
 
 # ============================================================================
-# Generate Sample Time-Series Data (In production, use real training data)
+# Generate Sample Time-Series Data
 # ============================================================================
 
 @st.cache_data
@@ -54,19 +58,19 @@ def generate_time_series_data():
         25 + 5 * np.sin((h - 6) * np.pi / 12) + np.random.normal(0, 2)
         for h in hours
     ]
-    hour_risk = [max(15, min(70, r)) for r in hour_risk]  # Clamp between 15-70
+    hour_risk = [max(15, min(70, r)) for r in hour_risk]
     
     # Day of week (0=Mon, 6=Sun)
     days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-    day_risk = [28, 26, 25, 27, 32, 45, 48]  # Weekend higher
+    day_risk = [28, 26, 25, 27, 32, 45, 48]
     
     # Month (1-12)
     months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-    month_risk = [30, 28, 27, 26, 28, 32, 35, 33, 30, 35, 52, 58]  # Holiday season spike
+    month_risk = [30, 28, 27, 26, 28, 32, 35, 33, 30, 35, 52, 58]
     
     # Week of month (1-4)
     weeks = ['Week 1', 'Week 2', 'Week 3', 'Week 4']
-    week_risk = [28, 32, 35, 42]  # End of month pressure
+    week_risk = [28, 32, 35, 42]
     
     return {
         'hours': hours,
@@ -113,18 +117,18 @@ with tab1:
         y=data['hour_risk'],
         mode='lines+markers',
         name='Risk Score',
-        line=dict(color='#3498DB', width=3),
+        line=dict(color=colors['primary'], width=3),
         marker=dict(size=8, color=data['hour_risk'], colorscale='RdYlGn_r', 
                     showscale=True, colorbar=dict(title="Risk Score")),
         fill='tozeroy',
-        fillcolor='rgba(52, 152, 219, 0.2)',
+        fillcolor=f"rgba(52, 152, 219, 0.2)",
         hovertemplate='<b>Hour: %{x}:00</b><br>Risk Score: %{y:.1f}<extra></extra>'
     ))
     
     # Add threshold lines
-    fig.add_hline(y=30, line_dash="dash", line_color="green", 
+    fig.add_hline(y=30, line_dash="dash", line_color=colors['low_risk'], 
                   annotation_text="Low Risk Threshold", annotation_position="right")
-    fig.add_hline(y=50, line_dash="dash", line_color="red", 
+    fig.add_hline(y=50, line_dash="dash", line_color=colors['high_risk'], 
                   annotation_text="High Risk Threshold", annotation_position="right")
     
     # Highlight peak hours
@@ -136,21 +140,33 @@ with tab1:
         text=f"Peak Risk<br>{peak_hour}:00",
         showarrow=True,
         arrowhead=2,
-        arrowcolor='red',
+        arrowcolor=colors['high_risk'],
         ax=0, ay=-40,
-        bgcolor='rgba(255, 0, 0, 0.1)',
-        bordercolor='red'
+        bgcolor='rgba(231, 76, 60, 0.2)',
+        bordercolor=colors['high_risk']
     )
     
     fig.update_layout(
-        title="Average Late Delivery Risk Score Throughout the Day",
+        title={
+            'text': "Average Late Delivery Risk Score Throughout the Day",
+            'font': {'size': 16}
+        },
         xaxis_title="Hour of Day (24-hour format)",
         yaxis_title="Average Risk Score",
         height=500,
-        plot_bgcolor='white',
-        paper_bgcolor='white',
+        plot_bgcolor=colors['bg_transparent'],
+        paper_bgcolor=colors['bg_transparent'],
         hovermode='x unified',
-        xaxis=dict(tickmode='linear', tick0=0, dtick=2)
+        xaxis=dict(
+            tickmode='linear', 
+            tick0=0, 
+            dtick=2,
+            gridcolor='rgba(128, 128, 128, 0.2)'
+        ),
+        yaxis=dict(
+            gridcolor='rgba(128, 128, 128, 0.2)'
+        ),
+        font=dict(size=12)
     )
     
     st.plotly_chart(fig, use_container_width=True)
@@ -202,15 +218,15 @@ with tab2:
     """)
     
     # Create color mapping
-    colors = ['#2ECC71' if r < 30 else '#F39C12' if r < 50 else '#E74C3C' 
-              for r in data['day_risk']]
+    bar_colors = [colors['low_risk'] if r < 30 else colors['medium_risk'] if r < 50 else colors['high_risk'] 
+                  for r in data['day_risk']]
     
     fig = go.Figure(go.Bar(
         x=data['days'],
         y=data['day_risk'],
         marker=dict(
-            color=colors,
-            line=dict(color='white', width=2)
+            color=bar_colors,
+            line=dict(color='rgba(128, 128, 128, 0.5)', width=2)
         ),
         text=data['day_risk'],
         texttemplate='%{text:.1f}',
@@ -219,17 +235,27 @@ with tab2:
     ))
     
     # Add threshold lines
-    fig.add_hline(y=30, line_dash="dash", line_color="green", opacity=0.5)
-    fig.add_hline(y=50, line_dash="dash", line_color="red", opacity=0.5)
+    fig.add_hline(y=30, line_dash="dash", line_color=colors['low_risk'], opacity=0.5)
+    fig.add_hline(y=50, line_dash="dash", line_color=colors['high_risk'], opacity=0.5)
     
     fig.update_layout(
-        title="Average Late Delivery Risk Score by Day of Week",
+        title={
+            'text': "Average Late Delivery Risk Score by Day of Week",
+            'font': {'size': 16}
+        },
         xaxis_title="Day of Week",
         yaxis_title="Average Risk Score",
         height=500,
-        plot_bgcolor='white',
-        paper_bgcolor='white',
-        yaxis=dict(range=[0, max(data['day_risk']) * 1.2])
+        plot_bgcolor=colors['bg_transparent'],
+        paper_bgcolor=colors['bg_transparent'],
+        yaxis=dict(
+            range=[0, max(data['day_risk']) * 1.2],
+            gridcolor='rgba(128, 128, 128, 0.2)'
+        ),
+        xaxis=dict(
+            gridcolor='rgba(128, 128, 128, 0.2)'
+        ),
+        font=dict(size=12)
     )
     
     st.plotly_chart(fig, use_container_width=True)
@@ -285,20 +311,19 @@ with tab3:
     # Line chart with markers
     fig = go.Figure()
     
-    # Add line
     fig.add_trace(go.Scatter(
         x=data['months'],
         y=data['month_risk'],
         mode='lines+markers',
         name='Risk Score',
-        line=dict(color='#E74C3C', width=3),
+        line=dict(color=colors['high_risk'], width=3),
         marker=dict(
             size=12,
             color=data['month_risk'],
             colorscale='RdYlGn_r',
             showscale=True,
             colorbar=dict(title="Risk Score"),
-            line=dict(color='white', width=2)
+            line=dict(color='rgba(128, 128, 128, 0.5)', width=2)
         ),
         fill='tozeroy',
         fillcolor='rgba(231, 76, 60, 0.1)',
@@ -308,7 +333,7 @@ with tab3:
     # Highlight holiday season
     fig.add_vrect(
         x0=10.5, x1=11.5,
-        fillcolor="rgba(255, 0, 0, 0.1)",
+        fillcolor="rgba(231, 76, 60, 0.1)",
         layer="below",
         line_width=0,
         annotation_text="Holiday Season",
@@ -316,12 +341,18 @@ with tab3:
     )
     
     fig.update_layout(
-        title="Average Late Delivery Risk Score by Month",
+        title={
+            'text': "Average Late Delivery Risk Score by Month",
+            'font': {'size': 16}
+        },
         xaxis_title="Month",
         yaxis_title="Average Risk Score",
         height=500,
-        plot_bgcolor='white',
-        paper_bgcolor='white'
+        plot_bgcolor=colors['bg_transparent'],
+        paper_bgcolor=colors['bg_transparent'],
+        yaxis=dict(gridcolor='rgba(128, 128, 128, 0.2)'),
+        xaxis=dict(gridcolor='rgba(128, 128, 128, 0.2)'),
+        font=dict(size=12)
     )
     
     st.plotly_chart(fig, use_container_width=True)
@@ -383,7 +414,7 @@ with tab4:
     for hour in range(24):
         for day in range(7):
             base_risk = data['hour_risk'][hour]
-            day_factor = data['day_risk'][day] / 30  # Normalize
+            day_factor = data['day_risk'][day] / 30
             heatmap_data[hour, day] = base_risk * day_factor * (1 + np.random.normal(0, 0.1))
     
     # Create heatmap
@@ -397,12 +428,16 @@ with tab4:
     ))
     
     fig.update_layout(
-        title="Late Delivery Risk: Hour of Day × Day of Week Heatmap",
+        title={
+            'text': "Late Delivery Risk: Hour of Day × Day of Week Heatmap",
+            'font': {'size': 16}
+        },
         xaxis_title="Day of Week",
         yaxis_title="Hour of Day",
         height=700,
-        plot_bgcolor='white',
-        paper_bgcolor='white'
+        plot_bgcolor=colors['bg_transparent'],
+        paper_bgcolor=colors['bg_transparent'],
+        font=dict(size=12)
     )
     
     st.plotly_chart(fig, use_container_width=True)
