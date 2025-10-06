@@ -13,7 +13,10 @@ def apply_adaptive_theme():
     
     st.markdown("""
     <style>
-        /* Adaptive color variables */
+        /* ================================================================ */
+        /* ADAPTIVE COLOR VARIABLES */
+        /* ================================================================ */
+        
         :root {
             --text-primary: #262730;
             --text-secondary: #555555;
@@ -33,7 +36,10 @@ def apply_adaptive_theme():
             }
         }
         
-        /* Ensure Streamlit respects theme */
+        /* ================================================================ */
+        /* LAYOUT - ADAPTIVE BACKGROUNDS */
+        /* ================================================================ */
+        
         [data-testid="stAppViewContainer"] {
             background-color: var(--bg-primary);
         }
@@ -42,7 +48,14 @@ def apply_adaptive_theme():
             background-color: var(--bg-secondary);
         }
         
-        /* Text colors that adapt */
+        [data-testid="stHeader"] {
+            background-color: var(--bg-primary);
+        }
+        
+        /* ================================================================ */
+        /* TEXT - ADAPTIVE COLORS */
+        /* ================================================================ */
+        
         .stMarkdown p, .stMarkdown li, .stMarkdown span {
             color: var(--text-primary) !important;
         }
@@ -60,40 +73,96 @@ def apply_adaptive_theme():
             color: var(--text-primary) !important;
         }
         
-        /* Info/Warning/Error boxes - adaptive backgrounds */
+        [data-testid="stMetricDelta"] {
+            color: var(--text-secondary) !important;
+        }
+        
+        /* Caption text */
+        .stCaption {
+            color: var(--text-secondary) !important;
+        }
+        
+        /* ================================================================ */
+        /* ALERT BOXES - ADAPTIVE */
+        /* ================================================================ */
+        
         .stAlert {
             background-color: var(--bg-secondary) !important;
             border: 1px solid var(--border-color) !important;
         }
         
-        /* Form inputs - adaptive */
+        /* Info boxes */
+        div[data-baseweb="notification"] {
+            background-color: var(--bg-secondary) !important;
+            border-color: var(--border-color) !important;
+        }
+        
+        /* ================================================================ */
+        /* FORM INPUTS - ADAPTIVE */
+        /* ================================================================ */
+        
         .stTextInput > div > div > input,
         .stNumberInput > div > div > input,
-        .stSelectbox > div > div > select {
+        .stSelectbox > div > div > select,
+        .stTextArea textarea {
             color: var(--text-primary) !important;
             background-color: var(--bg-secondary) !important;
             border-color: var(--border-color) !important;
         }
         
-        /* Tables - adaptive */
+        /* Input labels */
+        .stTextInput label,
+        .stNumberInput label,
+        .stSelectbox label,
+        .stTextArea label {
+            color: var(--text-primary) !important;
+        }
+        
+        /* ================================================================ */
+        /* TABLES - ADAPTIVE */
+        /* ================================================================ */
+        
         [data-testid="stDataFrame"] {
             background-color: var(--bg-primary) !important;
             color: var(--text-primary) !important;
         }
         
-        /* Code blocks - adaptive */
+        [data-testid="stTable"] {
+            background-color: var(--bg-primary) !important;
+            color: var(--text-primary) !important;
+        }
+        
+        /* ================================================================ */
+        /* CODE BLOCKS - ADAPTIVE */
+        /* ================================================================ */
+        
         .stCodeBlock {
             background-color: var(--bg-secondary) !important;
             border: 1px solid var(--border-color) !important;
         }
         
-        /* Expander - adaptive */
+        code {
+            background-color: var(--bg-secondary) !important;
+            color: var(--text-primary) !important;
+        }
+        
+        /* ================================================================ */
+        /* EXPANDERS - ADAPTIVE */
+        /* ================================================================ */
+        
         .streamlit-expanderHeader {
             background-color: var(--bg-secondary) !important;
             color: var(--text-primary) !important;
         }
         
-        /* Tabs - adaptive */
+        details[open] > summary {
+            border-bottom-color: var(--border-color) !important;
+        }
+        
+        /* ================================================================ */
+        /* TABS - ADAPTIVE */
+        /* ================================================================ */
+        
         .stTabs [data-baseweb="tab-list"] {
             background-color: var(--bg-secondary) !important;
         }
@@ -106,15 +175,179 @@ def apply_adaptive_theme():
             color: var(--text-primary) !important;
         }
         
-        /* Buttons - keep original colors but ensure text is visible */
-        .stButton > button {
-            color: #FFFFFF !important;
+        /* ================================================================ */
+        /* BUTTONS - ALWAYS VISIBLE (HIGHEST PRIORITY) */
+        /* ================================================================ */
+        
+        /* Primary buttons (type="primary") - Blue with white text */
+        button[kind="primary"],
+        button[data-testid="baseButton-primary"],
+        .stButton > button[kind="primary"] {
+            background-color: #0068C9 !important;
+            color: white !important;
+            border: 2px solid #0068C9 !important;
+            font-weight: 600 !important;
         }
         
-        /* Download buttons */
-        .stDownloadButton > button {
-            color: #FFFFFF !important;
+        button[kind="primary"]:hover,
+        button[data-testid="baseButton-primary"]:hover,
+        .stButton > button[kind="primary"]:hover {
+            background-color: #0056a3 !important;
+            border-color: #0056a3 !important;
+            color: white !important;
         }
+        
+        button[kind="primary"] p,
+        button[data-testid="baseButton-primary"] p,
+        .stButton > button[kind="primary"] p {
+            color: white !important;
+        }
+        
+        /* Secondary buttons (type="secondary") - Gray with dark text */
+        button[kind="secondary"],
+        button[data-testid="baseButton-secondary"],
+        .stButton > button[kind="secondary"] {
+            background-color: #F0F2F6 !important;
+            color: #262730 !important;
+            border: 2px solid #E0E0E0 !important;
+            font-weight: 600 !important;
+        }
+        
+        button[kind="secondary"]:hover,
+        button[data-testid="baseButton-secondary"]:hover,
+        .stButton > button[kind="secondary"]:hover {
+            background-color: #E0E0E0 !important;
+            border-color: #C0C0C0 !important;
+            color: #262730 !important;
+        }
+        
+        button[kind="secondary"] p,
+        button[data-testid="baseButton-secondary"] p,
+        .stButton > button[kind="secondary"] p {
+            color: #262730 !important;
+        }
+        
+        /* Regular buttons (no type specified) - Gray with dark text */
+        .stButton > button {
+            background-color: #F0F2F6 !important;
+            color: #262730 !important;
+            border: 2px solid #E0E0E0 !important;
+            font-weight: 600 !important;
+        }
+        
+        .stButton > button:hover {
+            background-color: #E0E0E0 !important;
+            border-color: #C0C0C0 !important;
+            color: #262730 !important;
+        }
+        
+        .stButton > button p,
+        .stButton > button span,
+        .stButton > button div {
+            color: #262730 !important;
+        }
+        
+        /* Download buttons - Always blue with white text */
+        div[data-testid="stDownloadButton"] {
+            display: flex !important;
+            align-items: center !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        
+        div[data-testid="stDownloadButton"] button {
+            background-color: #0068C9 !important;
+            color: white !important;
+            border: 2px solid #0068C9 !important;
+            font-weight: 600 !important;
+            padding: 0.5rem 1rem !important;
+            margin: 0 !important;
+            min-height: 48px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        
+        div[data-testid="stDownloadButton"] button:hover {
+            background-color: #0056a3 !important;
+            border-color: #0056a3 !important;
+            color: white !important;
+        }
+        
+        div[data-testid="stDownloadButton"] button *,
+        div[data-testid="stDownloadButton"] button p,
+        div[data-testid="stDownloadButton"] button span,
+        div[data-testid="stDownloadButton"] button div {
+            color: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        
+        /* Form submit buttons */
+        .stForm button[type="submit"] {
+            background-color: #0068C9 !important;
+            color: white !important;
+            border: 2px solid #0068C9 !important;
+            font-weight: 600 !important;
+        }
+        
+        .stForm button[type="submit"]:hover {
+            background-color: #0056a3 !important;
+            border-color: #0056a3 !important;
+            color: white !important;
+        }
+        
+        .stForm button[type="submit"] p {
+            color: white !important;
+        }
+        
+        /* Ensure all button text is visible */
+        button * {
+            font-weight: inherit !important;
+        }
+        
+        /* ================================================================ */
+        /* FILE UPLOADER - ADAPTIVE */
+        /* ================================================================ */
+        
+        [data-testid="stFileUploader"] {
+            background-color: var(--bg-secondary) !important;
+        }
+        
+        [data-testid="stFileUploader"] label {
+            color: var(--text-primary) !important;
+        }
+        
+        /* ================================================================ */
+        /* SIDEBAR SPECIFIC */
+        /* ================================================================ */
+        
+        [data-testid="stSidebar"] .stMarkdown {
+            color: var(--text-primary) !important;
+        }
+        
+        [data-testid="stSidebar"] h1,
+        [data-testid="stSidebar"] h2,
+        [data-testid="stSidebar"] h3 {
+            color: var(--text-primary) !important;
+        }
+        
+        /* ================================================================ */
+        /* PROGRESS BAR - ADAPTIVE */
+        /* ================================================================ */
+        
+        .stProgress > div > div > div {
+            background-color: #0068C9 !important;
+        }
+        
+        /* ================================================================ */
+        /* SPINNER - ADAPTIVE */
+        /* ================================================================ */
+        
+        .stSpinner > div {
+            border-top-color: #0068C9 !important;
+        }
+        
     </style>
     """, unsafe_allow_html=True)
 
