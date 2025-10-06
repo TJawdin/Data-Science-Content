@@ -128,7 +128,7 @@ def predict_batch(model, features_df):
             'Prediction': ['Late' if p == 1 else 'On-Time' for p in predictions],
             'Late_Probability': prob_late,
             'Risk_Score': (prob_late * 100).astype(int),
-            'Risk_Level': pd.cut(
+            'risk_level': pd.cut(
                 prob_late * 100,
                 bins=[0, 30, 70, 100],
                 labels=['LOW', 'MEDIUM', 'HIGH']
