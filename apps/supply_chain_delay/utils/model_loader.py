@@ -19,7 +19,7 @@ def load_model():
         artifacts_dir = Path(__file__).parent.parent / "artifacts"
         
         # Look for model files
-        model_files = list(artifacts_dir.glob("best_model_xgboost.pkl"))
+        model_files = list(artifacts_dir.glob("best_model_*.pkl"))
         
         if not model_files:
             # Fallback: look for any model file
@@ -30,7 +30,7 @@ def load_model():
             ⚠️ No model file found in artifacts/ folder.
             
             Please copy your trained model from the notebook to:
-            `apps/supply_chain_delay/artifacts/best_model_xgboost.pkl`
+            `apps/supply_chain_delay/artifacts/best_model_*.pkl`
             """)
             return None
         
@@ -38,7 +38,7 @@ def load_model():
         model_path = model_files[0]
         model = joblib.load(model_path)
         
-        
+        st.success(f"✅ Model loaded: {model_path.name}")
         return model
     
     except Exception as e:
@@ -46,61 +46,58 @@ def load_model():
         return None
 
 
-def predict_batch(model, features_list):
+def predict_single(model, features_df):
     """
-    Make predictions for multiple orders
+    Make prediction for a single order
     
     Parameters:
     -----------
     model : trained model
-    features_list : list of pd.DataFrame (each with 1 row × 30 features)
+    features_df : pd.DataFrame with 30 features
     
     Returns:
     --------
-    pd.DataFrame with predictions and risk scores
+    dict with prediction, probability, and risk score
     """
     try:
-        # Combine all features into one DataFrame
-        features_df = pd.concat(features_list, ignore_index=True)
+        # Get prediction
+        prediction = model.predict(features_df)[0]
         
-        # Get predictions
-        predictions = model.predict(features_df)
-        
-        # Get probabilities
+        # Get probability
         if hasattr(model, 'predict_proba'):
-            probabilities = model.predict_proba(features_df)
-            prob_late = probabilities[:, 1]
+            probabilities = model.predict_proba(features_df)[0]
+            prob_late = probabilities[1]
         else:
-            prob_late = predictions
+            # Fallback if no predict_proba
+            prob_late = prediction
         
-        # Calculate risk scores
-        risk_scores = (prob_late * 100).astype(int)
+        # Calculate risk score (0-100)
+        risk_score = int(prob_late * 100)
         
-        # Determine risk levels
-        def get_risk_level(score):
-            if score < 30:
-                return 'LOW'
-            elif score < 70:
-                return 'MEDIUM'
-            else:
-                return 'HIGH'
+        # Determine risk level
+        if risk_score < 30:
+            risk_level = "LOW"
+            risk_color = "green"
+        elif risk_score < 70:
+            risk_level = "MEDIUM"
+            risk_color = "orange"
+        else:
+            risk_level = "HIGH"
+            risk_color = "red"
         
-        risk_levels = [get_risk_level(score) for score in risk_scores]
-        
-        # Create results dataframe (lowercase column names for consistency)
-        results = pd.DataFrame({
-            'prediction': predictions,
-            'prediction_label': ['Late' if p == 1 else 'On-Time' for p in predictions],
-            'probability': prob_late,
-            'risk_score': risk_scores,
-            'risk_level': risk_levels
-        })
-        
-        return results
+        return {
+            'prediction': int(prediction),
+            'prediction_label': 'Late' if prediction == 1 else 'On-Time',
+            'probability': float(prob_late),
+            'risk_score': risk_score,
+            'risk_level': risk_level,
+            'risk_color': risk_color
+        }
     
     except Exception as e:
-        st.error(f"❌ Batch prediction error: {str(e)}")
+        st.error(f"❌ Prediction error: {str(e)}")
         return None
+
 
 def predict_batch(model, features_df):
     """
@@ -126,16 +123,26 @@ def predict_batch(model, features_df):
         else:
             prob_late = predictions
         
-        # Create results dataframe
+        # Calculate risk scores
+        risk_scores = (prob_late * 100).astype(int)
+        
+        # Determine risk levels
+        def get_risk_level(score):
+            if score < 30:
+                return 'LOW'
+            elif score < 70:
+                return 'MEDIUM'
+            else:
+                return 'HIGH'
+        
+        risk_levels = [get_risk_level(score) for score in risk_scores]
+        
+        # Create results dataframe (UPPERCASE to match batch page expectations)
         results = pd.DataFrame({
             'Prediction': ['Late' if p == 1 else 'On-Time' for p in predictions],
             'Late_Probability': prob_late,
-            'Risk_Score': (prob_late * 100).astype(int),
-            'risk_level': pd.cut(
-                prob_late * 100,
-                bins=[0, 30, 70, 100],
-                labels=['LOW', 'MEDIUM', 'HIGH']
-            )
+            'Risk_Score': risk_scores,
+            'risk_level': risk_levels  # lowercase for create_risk_distribution function
         })
         
         return results
