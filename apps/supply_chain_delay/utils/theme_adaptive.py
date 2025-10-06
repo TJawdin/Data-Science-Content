@@ -111,9 +111,38 @@ def apply_adaptive_theme():
             color: #FFFFFF !important;
         }
         
-        /* Download buttons */
-        .stDownloadButton > button {
-            color: #FFFFFF !important;
+        /* Download buttons - consistent styling and alignment */
+        div[data-testid="stDownloadButton"] {
+            display: flex !important;
+            align-items: center !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+    
+        div[data-testid="stDownloadButton"] button {
+            background-color: #0068C9 !important;
+            color: white !important;
+            border: 2px solid #0068C9 !important;
+            font-weight: 600 !important;
+            padding: 0.5rem 1rem !important;
+            margin: 0 !important;
+            min-height: 48px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+    
+        div[data-testid="stDownloadButton"] button:hover {
+            background-color: #0056a3 !important;
+            border-color: #0056a3 !important;
+            color: white !important;
+        }
+    
+        div[data-testid="stDownloadButton"] button *,
+        div[data-testid="stDownloadButton"] button p {
+            color: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
         }
     </style>
     """, unsafe_allow_html=True)
