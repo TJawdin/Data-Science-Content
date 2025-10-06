@@ -121,23 +121,7 @@ def apply_adaptive_theme():
             margin: 0 !important;
             vertical-align: middle !important;
         }
-        
-        div[data-testid="stDownloadButton"] button:hover {
-            background-color: #0056a3 !important;
-            border-color: #0056a3 !important;
-        }
-        
-        div[data-testid="stDownloadButton"] button * {
-            color: white !important;
-        }
-        
-        /* Align download button containers */
-        div[data-testid="stDownloadButton"] {
-            display: flex !important;
-            align-items: center !important;
-            margin-top: 0 !important;
-            padding-top: 0 !important;
-        }
+          
     </style>
     """, unsafe_allow_html=True)
 
