@@ -7,10 +7,6 @@ import streamlit as st
 import pandas as pd
 import sys
 from pathlib import Path
-from utils.theme_adaptive import apply_adaptive_theme
-
-# Apply theme right after page config
-apply_adaptive_theme()
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -25,7 +21,10 @@ st.set_page_config(
     page_icon="🎯",
     layout="wide"
 )
+from utils.theme_adaptive import apply_adaptive_theme
 
+# Apply theme right after page config
+apply_adaptive_theme()
 # ============================================================================
 # Header
 # ============================================================================
