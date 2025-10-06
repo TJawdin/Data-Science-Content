@@ -240,15 +240,23 @@ st.markdown("---")
 
 st.markdown("### 📄 Step 1: Prepare Your CSV File")
 
-st.info("""
-**Required Columns** (minimum):
-- `num_items`, `total_order_value`, `total_shipping_cost`, `total_weight_g`
-- `avg_length_cm`, `avg_height_cm`, `avg_width_cm`
-- `avg_shipping_distance_km`, `estimated_days`
+# Use HTML/CSS for guaranteed visibility
+st.markdown("""
+<div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; border: 1px solid #e0e0e0;">
+    <p style="color: #262730; margin: 0; font-size: 14px;">
+        <strong style="color: #262730;">Required Columns</strong> (minimum):<br>
+        • <code>num_items</code>, <code>total_order_value</code>, <code>total_shipping_cost</code>, <code>total_weight_g</code><br>
+        • <code>avg_length_cm</code>, <code>avg_height_cm</code>, <code>avg_width_cm</code><br>
+        • <code>avg_shipping_distance_km</code>, <code>estimated_days</code>
+    </p>
+    <p style="color: #262730; margin-top: 10px; font-size: 14px;">
+        <strong style="color: #262730;">Optional Columns</strong> (will use defaults if missing):<br>
+        • <code>num_sellers</code>, <code>is_cross_state</code>, <code>order_weekday</code>, <code>order_month</code>, <code>order_hour</code>
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
-**Optional Columns** (will use defaults if missing):
-- `num_sellers`, `is_cross_state`, `order_weekday`, `order_month`, `order_hour`
-""")
+st.markdown("<br>", unsafe_allow_html=True)
 
 # Create sample CSV template
 sample_data = {
@@ -276,23 +284,41 @@ csv_buffer = BytesIO()
 sample_df.to_csv(csv_buffer, index=False)
 csv_buffer.seek(0)
 
-# Center the download button
+# Center the download button with custom styling
 col_left, col_center, col_right = st.columns([1, 2, 1])
 
 with col_center:
+    st.markdown("""
+    <style>
+        div[data-testid="stDownloadButton"] button {
+            background-color: #0068C9 !important;
+            color: white !important;
+            border: none !important;
+            padding: 10px 20px !important;
+            font-weight: 600 !important;
+        }
+        div[data-testid="stDownloadButton"] button:hover {
+            background-color: #0056a3 !important;
+            color: white !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
     st.download_button(
         label="📥 Download Sample CSV Template",
         data=csv_buffer,
         file_name="sample_orders_template.csv",
         mime="text/csv",
-        use_container_width=True,
-        type="secondary"
+        use_container_width=True
     )
 
-st.caption("💡 The sample template contains 3 example orders for reference")
+st.markdown("""
+<p style="text-align: center; color: #666666; font-size: 12px; margin-top: 10px;">
+    💡 The sample template contains 3 example orders for reference
+</p>
+""", unsafe_allow_html=True)
 
-st.markdown("---")
-# ============================================================================
+st.markdown("---")# ============================================================================
 # File Upload
 # ============================================================================
 
