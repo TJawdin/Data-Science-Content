@@ -1,0 +1,74 @@
+{
+  "Logistic Regression": {
+    "cv_score": 0.7097919784603969,
+    "test_accuracy": 0.6315925945133019,
+    "test_precision": 0.13417688150784235,
+    "test_recall": 0.6555054732775274,
+    "test_f1": 0.22275711159737419,
+    "test_roc_auc": 0.7007259932833818,
+    "best_params": {
+      "clf__penalty": "l2",
+      "clf__C": 0.021544346900318832
+    }
+  },
+  "Decision Tree": {
+    "cv_score": 0.7232122797941329,
+    "test_accuracy": 0.7237463050355235,
+    "test_precision": 0.17102510460251047,
+    "test_recall": 0.631680618158403,
+    "test_f1": 0.2691727260255179,
+    "test_roc_auc": 0.722800510919135,
+    "best_params": {
+      "min_samples_split": 5,
+      "min_samples_leaf": 10,
+      "max_depth": 7,
+      "criterion": "gini"
+    }
+  },
+  "Random Forest": {
+    "cv_score": 0.7408929143427722,
+    "test_accuracy": 0.7848363843800239,
+    "test_precision": 0.19343410486537554,
+    "test_recall": 0.527366387636832,
+    "test_f1": 0.28304821150855364,
+    "test_roc_auc": 0.7377410096136909,
+    "best_params": {
+      "n_estimators": 200,
+      "min_samples_split": 10,
+      "min_samples_leaf": 4,
+      "max_features": "sqrt",
+      "max_depth": 10
+    }
+  },
+  "XGBoost": {
+    "cv_score": 0.7553528310013741,
+    "test_accuracy": 0.7234351501322408,
+    "test_precision": 0.1748107364074329,
+    "test_recall": 0.6542176432710882,
+    "test_f1": 0.27589952477936186,
+    "test_roc_auc": 0.7482959677410568,
+    "best_params": {
+      "subsample": 0.8,
+      "reg_lambda": 5,
+      "n_estimators": 500,
+      "max_depth": 5,
+      "learning_rate": 0.01,
+      "colsample_bytree": 0.9
+    }
+  },
+  "CatBoost": {
+    "cv_score": 0.7518486113359605,
+    "test_accuracy": 0.7108333765492921,
+    "test_precision": 0.16768544523376838,
+    "test_recall": 0.6535737282678686,
+    "test_f1": 0.2668945569287405,
+    "test_roc_auc": 0.7448151586235399,
+    "best_params": {
+      "subsample": 0.8,
+      "learning_rate": 0.05,
+      "l2_leaf_reg": 5,
+      "iterations": 200,
+      "depth": 6
+    }
+  }
+}
