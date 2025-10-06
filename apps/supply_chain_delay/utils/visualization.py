@@ -8,6 +8,7 @@ import plotly.express as px
 import pandas as pd
 import numpy as np
 import streamlit as st
+from utils.theme_adaptive import get_adaptive_colors, configure_plotly_figure
 
 # ============================================================================
 # Risk Gauge (Speedometer) - FIXED TEXT CUTOFF
@@ -16,20 +17,17 @@ import streamlit as st
 def create_risk_gauge(risk_score, risk_level):
     """
     Create an interactive gauge chart showing risk score
-    
-    Parameters:
-    -----------
-    risk_score : int (0-100)
-    risk_level : str ('LOW', 'MEDIUM', 'HIGH')
     """
+    
+    colors = get_adaptive_colors()
     
     # Color based on risk level
     if risk_level == 'LOW':
-        bar_color = '#2ECC71'  # Green
+        bar_color = colors['low_risk']
     elif risk_level == 'MEDIUM':
-        bar_color = '#F39C12'  # Orange
+        bar_color = colors['medium_risk']
     else:
-        bar_color = '#E74C3C'  # Red
+        bar_color = colors['high_risk']
     
     fig = go.Figure(go.Indicator(
         mode="gauge+number+delta",
@@ -39,25 +37,25 @@ def create_risk_gauge(risk_score, risk_level):
             'text': f"<b>Late Delivery Risk</b><br><span style='font-size:0.7em;color:{bar_color}'>{risk_level} RISK</span>", 
             'font': {'size': 20}
         },
-        delta={'reference': 50, 'increasing': {'color': "red"}, 'decreasing': {'color': "green"}},
+        delta={'reference': 50, 'increasing': {'color': colors['high_risk']}, 'decreasing': {'color': colors['low_risk']}},
         number={'font': {'size': 50}},
         gauge={
             'axis': {
                 'range': [None, 100], 
                 'tickwidth': 2, 
-                'tickcolor': "darkgray",
+                'tickcolor': "gray",
                 'tickmode': 'linear',
                 'tick0': 0,
                 'dtick': 20
             },
             'bar': {'color': bar_color, 'thickness': 0.75},
-            'bgcolor': "white",
+            'bgcolor': colors['bg_transparent'],
             'borderwidth': 2,
             'bordercolor': "gray",
             'steps': [
-                {'range': [0, 30], 'color': '#D5F4E6'},
-                {'range': [30, 70], 'color': '#FEF5E7'},
-                {'range': [70, 100], 'color': '#FADBD8'}
+                {'range': [0, 30], 'color': 'rgba(46, 204, 113, 0.2)'},
+                {'range': [30, 70], 'color': 'rgba(243, 156, 18, 0.2)'},
+                {'range': [70, 100], 'color': 'rgba(231, 76, 60, 0.2)'}
             ],
             'threshold': {
                 'line': {'color': "black", 'width': 4},
@@ -67,11 +65,12 @@ def create_risk_gauge(risk_score, risk_level):
         }
     ))
     
+    # Apply adaptive configuration
     fig.update_layout(
         height=350,
         margin=dict(l=30, r=30, t=100, b=30),
-        paper_bgcolor="white",
-        font={'color': "darkgray", 'family': "Arial"}
+        paper_bgcolor=colors['bg_transparent'],
+        plot_bgcolor=colors['bg_transparent']
     )
     
     return fig
