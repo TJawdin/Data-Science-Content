@@ -11,6 +11,10 @@ import json
 from pathlib import Path
 import plotly.graph_objects as go
 import plotly.express as px
+from utils.theme_adaptive import apply_adaptive_theme
+
+# Apply theme right after page config
+apply_adaptive_theme()
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
