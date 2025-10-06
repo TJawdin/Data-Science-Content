@@ -117,7 +117,7 @@ with col1:
     st.metric(
         label="AUC-ROC Score",
         value=f"{auc_value:.4f}",
-        delta="✅ Target: ≥0.85" if auc_value >= 0.85 else "⚠️ Target: ≥0.85"
+        #delta="✅ Target: ≥0.85" if auc_value >= 0.85 else "⚠️ Target: ≥0.85"
     )
 
 with col2:
