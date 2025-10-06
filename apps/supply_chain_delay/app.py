@@ -202,7 +202,7 @@ with col1:
 with col2:
     st.warning("""
     **Model Information:**  
-    - Algorithm: Ensemble Machine Learning  
+    - Algorithm: XGBoost (Gradient Boosting)  
     - Features: 30 domain-engineered features  
     - Training: 5-fold cross-validation  
     - Metrics: AUC-ROC, Precision, Recall, F1-Score
