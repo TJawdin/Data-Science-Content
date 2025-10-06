@@ -49,153 +49,153 @@ if model is None:
     st.stop()
 
 # ============================================================================
-# Define Example Scenarios - OPTIMIZED FOR YOUR MODEL
+# Define Example Scenarios - CALIBRATED TO ACTUAL MODEL BEHAVIOR
 # ============================================================================
 
 scenarios = {
     "🔴 HIGH RISK: Budget Shipping Long Distance": {
-        'description': "Single item, VERY CHEAP shipping ($0.005/km), long distance, tight timeline",
+        'description': "Low value, VERY CHEAP shipping ($0.0033/km), long distance, tight timeline, holiday rush",
         'data': {
             'num_items': 1,
             'num_sellers': 1,
             'num_products': 1,
-            'total_order_value': 45.0,  # Low value
-            'avg_item_price': 45.0,
-            'max_item_price': 45.0,
-            'total_shipping_cost': 6.50,  # CHEAP for distance!
-            'avg_shipping_cost': 6.50,
-            'total_weight_g': 1200,
-            'avg_weight_g': 1200,
-            'max_weight_g': 1200,
-            'avg_length_cm': 35.0,
-            'avg_height_cm': 25.0,
-            'avg_width_cm': 15.0,
-            'avg_shipping_distance_km': 1300,  # LONG
-            'max_shipping_distance_km': 1300,
+            'total_order_value': 35.0,
+            'avg_item_price': 35.0,
+            'max_item_price': 35.0,
+            'total_shipping_cost': 5.0,
+            'avg_shipping_cost': 5.0,
+            'total_weight_g': 1500,
+            'avg_weight_g': 1500,
+            'max_weight_g': 1500,
+            'avg_length_cm': 40.0,
+            'avg_height_cm': 30.0,
+            'avg_width_cm': 20.0,
+            'avg_shipping_distance_km': 1500,
+            'max_shipping_distance_km': 1500,
             'is_cross_state': 1,
-            'order_weekday': 4,  # Friday
-            'order_month': 12,  # December
-            'order_hour': 18,
-            'is_weekend_order': 0,
+            'order_weekday': 5,
+            'order_month': 12,
+            'order_hour': 20,
+            'is_weekend_order': 1,
             'is_holiday_season': 1,
-            'estimated_days': 3  # Rush!
+            'estimated_days': 3
         },
         'color': 'red'
     },
     
     "🟡 MEDIUM RISK: Multi-Seller Cross-State": {
-        'description': "Multiple items, moderate shipping, cross-state, reasonable timeline",
+        'description': "Multiple items, standard shipping ($0.026/km), cross-state, moderate timeline",
         'data': {
             'num_items': 3,
             'num_sellers': 2,
             'num_products': 3,
-            'total_order_value': 180.0,
-            'avg_item_price': 60.0,
-            'max_item_price': 85.0,
-            'total_shipping_cost': 22.0,  # Medium
-            'avg_shipping_cost': 11.0,
-            'total_weight_g': 2200,
-            'avg_weight_g': 733,
-            'max_weight_g': 1000,
-            'avg_length_cm': 28.0,
-            'avg_height_cm': 18.0,
-            'avg_width_cm': 12.0,
-            'avg_shipping_distance_km': 880,
-            'max_shipping_distance_km': 880,
+            'total_order_value': 150.0,
+            'avg_item_price': 50.0,
+            'max_item_price': 75.0,
+            'total_shipping_cost': 18.0,
+            'avg_shipping_cost': 6.0,
+            'total_weight_g': 2500,
+            'avg_weight_g': 833,
+            'max_weight_g': 1100,
+            'avg_length_cm': 30.0,
+            'avg_height_cm': 20.0,
+            'avg_width_cm': 15.0,
+            'avg_shipping_distance_km': 700,
+            'max_shipping_distance_km': 700,
             'is_cross_state': 1,
-            'order_weekday': 2,
-            'order_month': 7,
+            'order_weekday': 3,
+            'order_month': 8,
             'order_hour': 14,
             'is_weekend_order': 0,
             'is_holiday_season': 0,
-            'estimated_days': 10
+            'estimated_days': 9
         },
         'color': 'orange'
     },
     
-    "🟢 LOW RISK: Premium Shipping Short Distance": {
-        'description': "High value, PREMIUM shipping ($0.072/km), short distance, comfortable timeline",
+    "🟢 LOW RISK: Premium Local Delivery": {
+        'description': "High value, PREMIUM shipping ($0.167/km), very short distance, generous timeline",
         'data': {
-            'num_items': 5,
+            'num_items': 2,
             'num_sellers': 1,
-            'num_products': 5,
-            'total_order_value': 450.0,  # High value
-            'avg_item_price': 90.0,
-            'max_item_price': 150.0,
-            'total_shipping_cost': 18.0,  # Premium!
-            'avg_shipping_cost': 3.60,
-            'total_weight_g': 1100,
-            'avg_weight_g': 220,
-            'max_weight_g': 400,
-            'avg_length_cm': 22.0,
+            'num_products': 2,
+            'total_order_value': 380.0,
+            'avg_item_price': 190.0,
+            'max_item_price': 220.0,
+            'total_shipping_cost': 25.0,
+            'avg_shipping_cost': 12.5,
+            'total_weight_g': 800,
+            'avg_weight_g': 400,
+            'max_weight_g': 500,
+            'avg_length_cm': 20.0,
             'avg_height_cm': 15.0,
             'avg_width_cm': 10.0,
-            'avg_shipping_distance_km': 250,  # SHORT
-            'max_shipping_distance_km': 250,
-            'is_cross_state': 0,  # Same state
+            'avg_shipping_distance_km': 150,
+            'max_shipping_distance_km': 150,
+            'is_cross_state': 0,
             'order_weekday': 1,
-            'order_month': 3,
+            'order_month': 4,
             'order_hour': 10,
             'is_weekend_order': 0,
             'is_holiday_season': 0,
-            'estimated_days': 7
+            'estimated_days': 10
         },
         'color': 'green'
     },
     
-    "🟢 LOW RISK: Local Standard Order": {
-        'description': "Single item, local delivery, standard shipping, plenty of time",
+    "🟢 LOW RISK: Same-City Express": {
+        'description': "Local delivery, premium service, comfortable timeline",
         'data': {
             'num_items': 1,
             'num_sellers': 1,
             'num_products': 1,
-            'total_order_value': 95.0,
-            'avg_item_price': 95.0,
-            'max_item_price': 95.0,
-            'total_shipping_cost': 7.0,
-            'avg_shipping_cost': 7.0,
+            'total_order_value': 120.0,
+            'avg_item_price': 120.0,
+            'max_item_price': 120.0,
+            'total_shipping_cost': 15.0,
+            'avg_shipping_cost': 15.0,
             'total_weight_g': 600,
             'avg_weight_g': 600,
             'max_weight_g': 600,
-            'avg_length_cm': 20.0,
-            'avg_height_cm': 15.0,
-            'avg_width_cm': 10.0,
-            'avg_shipping_distance_km': 120,
-            'max_shipping_distance_km': 120,
+            'avg_length_cm': 22.0,
+            'avg_height_cm': 16.0,
+            'avg_width_cm': 12.0,
+            'avg_shipping_distance_km': 80,
+            'max_shipping_distance_km': 80,
             'is_cross_state': 0,
             'order_weekday': 2,
             'order_month': 5,
             'order_hour': 11,
             'is_weekend_order': 0,
             'is_holiday_season': 0,
-            'estimated_days': 14
+            'estimated_days': 12
         },
         'color': 'green'
     },
     
-    "🟡 MEDIUM RISK: Holiday Season Multi-Item": {
-        'description': "Holiday season, multi-item, cross-state, moderate complexity",
+    "🟡 MEDIUM RISK: Weekend Holiday Order": {
+        'description': "Holiday season, weekend order, moderate distance",
         'data': {
             'num_items': 4,
             'num_sellers': 2,
             'num_products': 4,
-            'total_order_value': 275.0,
-            'avg_item_price': 68.75,
-            'max_item_price': 110.0,
-            'total_shipping_cost': 32.0,
-            'avg_shipping_cost': 8.0,
-            'total_weight_g': 3200,
-            'avg_weight_g': 800,
-            'max_weight_g': 1400,
+            'total_order_value': 220.0,
+            'avg_item_price': 55.0,
+            'max_item_price': 90.0,
+            'total_shipping_cost': 24.0,
+            'avg_shipping_cost': 6.0,
+            'total_weight_g': 3000,
+            'avg_weight_g': 750,
+            'max_weight_g': 1200,
             'avg_length_cm': 32.0,
-            'avg_height_cm': 22.0,
+            'avg_height_cm': 24.0,
             'avg_width_cm': 18.0,
-            'avg_shipping_distance_km': 650,
-            'max_shipping_distance_km': 750,
+            'avg_shipping_distance_km': 820,
+            'max_shipping_distance_km': 820,
             'is_cross_state': 1,
-            'order_weekday': 5,
+            'order_weekday': 6,
             'order_month': 11,
-            'order_hour': 17,
+            'order_hour': 18,
             'is_weekend_order': 1,
             'is_holiday_season': 1,
             'estimated_days': 8
@@ -392,9 +392,9 @@ with st.sidebar:
     st.success("""
     **Shipping cost per km** is the #1 risk factor!
     
-    - Budget shipping ($0.005/km) = HIGH risk
-    - Standard shipping ($0.025/km) = MEDIUM risk  
-    - Premium shipping ($0.072/km) = LOW risk
+    - Budget shipping ($0.003/km) = HIGH risk 🔴
+    - Standard shipping ($0.026/km) = MEDIUM risk 🟡
+    - Premium shipping ($0.167/km) = LOW risk 🟢
     
     Compare scenarios to see this pattern!
     """)
