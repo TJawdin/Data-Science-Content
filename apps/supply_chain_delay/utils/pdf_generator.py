@@ -252,7 +252,7 @@ be used as guidance alongside human judgment and business context.
     
     pdf.chapter_body(model_info.strip())
     
-        # ========================================================================
+    # ========================================================================
     # DISCLAIMER
     # ========================================================================
     
@@ -277,5 +277,5 @@ be used as guidance alongside human judgment and business context.
     pdf.set_text_color(128, 128, 128)
     pdf.cell(0, 4, f'Report ID: {datetime.now().strftime("%Y%m%d%H%M%S")}', 0, 1, 'C')
     
-    # Return PDF as bytes (fpdf2 returns bytes directly, no encoding needed)
-    return pdf.output()
+    # Return PDF as bytes (convert bytearray to bytes for Streamlit)
+    return bytes(pdf.output())
