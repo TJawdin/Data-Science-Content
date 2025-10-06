@@ -10,7 +10,7 @@ import numpy as np
 import streamlit as st
 
 # ============================================================================
-# Risk Gauge (Speedometer)
+# Risk Gauge (Speedometer) - FIXED TEXT CUTOFF
 # ============================================================================
 
 def create_risk_gauge(risk_score, risk_level):
@@ -25,21 +25,31 @@ def create_risk_gauge(risk_score, risk_level):
     
     # Color based on risk level
     if risk_level == 'LOW':
-        bar_color = 'green'
+        bar_color = '#2ECC71'  # Green
     elif risk_level == 'MEDIUM':
-        bar_color = 'orange'
+        bar_color = '#F39C12'  # Orange
     else:
-        bar_color = 'red'
+        bar_color = '#E74C3C'  # Red
     
     fig = go.Figure(go.Indicator(
         mode="gauge+number+delta",
         value=risk_score,
         domain={'x': [0, 1], 'y': [0, 1]},
-        title={'text': f"<b>Late Delivery Risk</b><br><span style='font-size:0.8em'>{risk_level} RISK</span>", 
-               'font': {'size': 24}},
-        delta={'reference': 50, 'increasing': {'color': "red"}},
+        title={
+            'text': f"<b>Late Delivery Risk</b><br><span style='font-size:0.7em;color:{bar_color}'>{risk_level} RISK</span>", 
+            'font': {'size': 20}
+        },
+        delta={'reference': 50, 'increasing': {'color': "red"}, 'decreasing': {'color': "green"}},
+        number={'font': {'size': 50}},
         gauge={
-            'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "darkgray"},
+            'axis': {
+                'range': [None, 100], 
+                'tickwidth': 2, 
+                'tickcolor': "darkgray",
+                'tickmode': 'linear',
+                'tick0': 0,
+                'dtick': 20
+            },
             'bar': {'color': bar_color, 'thickness': 0.75},
             'bgcolor': "white",
             'borderwidth': 2,
@@ -58,8 +68,8 @@ def create_risk_gauge(risk_score, risk_level):
     ))
     
     fig.update_layout(
-        height=300,
-        margin=dict(l=20, r=20, t=60, b=20),
+        height=350,
+        margin=dict(l=30, r=30, t=100, b=30),
         paper_bgcolor="white",
         font={'color': "darkgray", 'family': "Arial"}
     )
@@ -102,8 +112,8 @@ def create_shap_waterfall(feature_contributions, base_value, prediction_value):
         text=[f"{c:+.3f}" for c in contributions] + [f"{prediction_value:.3f}"],
         y=contributions + [prediction_value - base_value],
         connector={"line": {"color": "rgb(63, 63, 63)"}},
-        increasing={"marker": {"color": "#E74C3C"}},  # Red for increases risk
-        decreasing={"marker": {"color": "#2ECC71"}},  # Green for decreases risk
+        increasing={"marker": {"color": "#E74C3C"}},
+        decreasing={"marker": {"color": "#2ECC71"}},
         totals={"marker": {"color": "#3498DB"}}
     ))
     
@@ -115,7 +125,8 @@ def create_shap_waterfall(feature_contributions, base_value, prediction_value):
         xaxis_title="Features",
         yaxis_title="SHAP Value (Impact on Prediction)",
         plot_bgcolor='white',
-        paper_bgcolor='white'
+        paper_bgcolor='white',
+        margin=dict(l=50, r=50, t=100, b=100)
     )
     
     fig.update_xaxes(tickangle=-45)
@@ -124,7 +135,7 @@ def create_shap_waterfall(feature_contributions, base_value, prediction_value):
 
 
 # ============================================================================
-# Feature Correlation Heatmap
+# Feature Correlation Heatmap - FIXED CUTOFF
 # ============================================================================
 
 def create_correlation_heatmap(features_df, feature_names_mapping=None):
@@ -165,7 +176,8 @@ def create_correlation_heatmap(features_df, feature_names_mapping=None):
         xaxis_title="",
         yaxis_title="",
         plot_bgcolor='white',
-        paper_bgcolor='white'
+        paper_bgcolor='white',
+        margin=dict(l=200, r=50, t=100, b=150)
     )
     
     fig.update_xaxes(tickangle=-45)
@@ -194,9 +206,9 @@ def create_risk_distribution(risk_scores):
         marker=dict(
             color=risk_scores,
             colorscale=[
-                [0, '#2ECC71'],      # Green (low risk)
-                [0.3, '#F39C12'],    # Orange (medium risk)
-                [0.7, '#E74C3C']     # Red (high risk)
+                [0, '#2ECC71'],
+                [0.3, '#F39C12'],
+                [0.7, '#E74C3C']
             ],
             line=dict(color='white', width=1)
         ),
@@ -211,7 +223,8 @@ def create_risk_distribution(risk_scores):
         height=400,
         plot_bgcolor='white',
         paper_bgcolor='white',
-        showlegend=False
+        showlegend=False,
+        margin=dict(l=50, r=50, t=80, b=50)
     )
     
     # Add vertical lines for risk thresholds
@@ -224,7 +237,7 @@ def create_risk_distribution(risk_scores):
 
 
 # ============================================================================
-# Feature Impact Bar Chart
+# Feature Impact Bar Chart - FIXED CUTOFF
 # ============================================================================
 
 def create_feature_impact_bars(feature_importance_df, top_n=10):
@@ -261,10 +274,11 @@ def create_feature_impact_bars(feature_importance_df, top_n=10):
         height=500,
         plot_bgcolor='white',
         paper_bgcolor='white',
-        showlegend=False
+        showlegend=False,
+        margin=dict(l=250, r=50, t=80, b=50)
     )
     
-    fig.update_yaxes(autorange="reversed")  # Highest at top
+    fig.update_yaxes(autorange="reversed")
     
     return fig
 
@@ -299,9 +313,6 @@ def create_brazil_state_heatmap(state_late_rates):
         for code, rate in state_late_rates.items()
     ])
     
-    # Note: Plotly doesn't have built-in Brazil map, so we'll use a table-based visualization
-    # For a real map, you'd need GeoJSON data for Brazil states
-    
     fig = px.bar(
         df.sort_values('Late Rate', ascending=False).head(15),
         x='State Code',
@@ -317,7 +328,8 @@ def create_brazil_state_heatmap(state_late_rates):
         height=500,
         plot_bgcolor='white',
         paper_bgcolor='white',
-        title_font_size=16
+        title_font_size=16,
+        margin=dict(l=50, r=50, t=100, b=50)
     )
     
     return fig
@@ -345,7 +357,7 @@ def create_batch_summary_dashboard(predictions_df):
             'Prediction Distribution',
             'Risk Level Distribution',
             'Risk Score Distribution',
-            'Average Risk by Feature'
+            'Summary Statistics'
         ),
         specs=[
             [{'type': 'pie'}, {'type': 'bar'}],
@@ -376,9 +388,9 @@ def create_batch_summary_dashboard(predictions_df):
         row=2, col=1
     )
     
-    # 4. Placeholder for feature analysis
+    # 4. Placeholder
     fig.add_trace(
-        go.Bar(x=['Feature Analysis'], y=[0]),
+        go.Bar(x=['Stats'], y=[0]),
         row=2, col=2
     )
     
@@ -386,7 +398,8 @@ def create_batch_summary_dashboard(predictions_df):
         height=700,
         showlegend=False,
         title_text="📊 Batch Prediction Summary Dashboard",
-        title_font_size=18
+        title_font_size=18,
+        margin=dict(l=50, r=50, t=100, b=50)
     )
     
     return fig
