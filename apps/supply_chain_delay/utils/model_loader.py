@@ -38,7 +38,6 @@ def load_model():
         model_path = model_files[0]
         model = joblib.load(model_path)
         
-        
         return model
     
     except Exception as e:
@@ -74,14 +73,15 @@ def predict_single(model, features_df):
         # Calculate risk score (0-100)
         risk_score = int(prob_late * 100)
         
-        # Determine risk level
-        if risk_score < 30:
+        # Determine risk level based on optimized threshold (18.44%)
+        # Aligned with model's precision-recall optimization
+        if risk_score < 10:           # 0-9%: Very low risk
             risk_level = "LOW"
             risk_color = "green"
-        elif risk_score < 70:
+        elif risk_score < 26:         # 10-25%: Around threshold (18.44%)
             risk_level = "MEDIUM"
             risk_color = "orange"
-        else:
+        else:                         # 26%+: Above threshold = HIGH
             risk_level = "HIGH"
             risk_color = "red"
         
@@ -126,11 +126,11 @@ def predict_batch(model, features_df):
         # Calculate risk scores
         risk_scores = (prob_late * 100).astype(int)
         
-        # Determine risk levels
+        # Determine risk levels based on optimized threshold (18.44%)
         def get_risk_level(score):
-            if score < 30:
+            if score < 10:
                 return 'LOW'
-            elif score < 70:
+            elif score < 26:
                 return 'MEDIUM'
             else:
                 return 'HIGH'
