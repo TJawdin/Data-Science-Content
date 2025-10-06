@@ -109,6 +109,15 @@ with col4:
 
 st.markdown("---")
 
+st.markdown("### 🏆 Optimization Results")
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.metric("Precision", "23.4%", "+33.6% vs baseline")
+with col2:
+    st.metric("Optimal Threshold", "18.44%")
+with col3:
+    st.metric("Optimization Method", "Bayesian (Optuna)")
+    
 # Features Section
 st.markdown("### ✨ Key Features")
 
