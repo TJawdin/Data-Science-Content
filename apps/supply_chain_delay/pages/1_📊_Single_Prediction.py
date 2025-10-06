@@ -349,6 +349,22 @@ if submitted:
                     'risk_level': result['risk_level']
                 }
                 
+                                # Add CSS for button visibility
+                st.markdown("""
+                <style>
+                    div[data-testid="stDownloadButton"] button {
+                        background-color: #0068C9 !important;
+                        color: white !important;
+                        border: 2px solid #0068C9 !important;
+                        font-weight: 600 !important;
+                    }
+                    div[data-testid="stDownloadButton"] button:hover {
+                        background-color: #0056a3 !important;
+                        border-color: #0056a3 !important;
+                    }
+                </style>
+                """, unsafe_allow_html=True)
+                
                 st.download_button(
                     label="📊 Download Data (JSON)",
                     data=json.dumps(json_data, indent=2, default=str),
