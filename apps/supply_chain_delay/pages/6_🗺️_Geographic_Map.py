@@ -21,7 +21,10 @@ st.set_page_config(
     page_icon="🗺️",
     layout="wide"
 )
+from utils.theme_adaptive import apply_adaptive_theme
 
+# Apply theme right after page config
+apply_adaptive_theme()
 # ============================================================================
 # Header
 # ============================================================================
