@@ -4,7 +4,6 @@ streamlit
 # Data Science
 pandas
 numpy
-json
 
 # Machine Learning
 scikit-learn
