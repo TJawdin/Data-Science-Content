@@ -50,31 +50,31 @@ if model is None:
 
 scenarios = {
     "🟢 LOW RISK: Standard Local Order": {
-        'description': "Single item, local delivery, standard timeframe",
+        'description': "Single item, local delivery, generous timeframe, low shipping cost",
         'data': {
             'num_items': 1,
             'num_sellers': 1,
             'num_products': 1,
-            'total_order_value': 50.0,
-            'avg_item_price': 50.0,
-            'max_item_price': 50.0,
-            'total_shipping_cost': 10.0,
-            'avg_shipping_cost': 10.0,
-            'total_weight_g': 500,
-            'avg_weight_g': 500,
-            'max_weight_g': 500,
-            'avg_length_cm': 20.0,
-            'avg_height_cm': 15.0,
-            'avg_width_cm': 10.0,
-            'avg_shipping_distance_km': 100,
-            'max_shipping_distance_km': 100,
+            'total_order_value': 120.0,
+            'avg_item_price': 120.0,
+            'max_item_price': 120.0,
+            'total_shipping_cost': 8.0,
+            'avg_shipping_cost': 8.0,
+            'total_weight_g': 800,
+            'avg_weight_g': 800,
+            'max_weight_g': 800,
+            'avg_length_cm': 25.0,
+            'avg_height_cm': 18.0,
+            'avg_width_cm': 12.0,
+            'avg_shipping_distance_km': 80,
+            'max_shipping_distance_km': 80,
             'is_cross_state': 0,
-            'order_weekday': 2,  # Wednesday
-            'order_month': 6,  # June
-            'order_hour': 14,  # 2 PM
+            'order_weekday': 2,
+            'order_month': 5,
+            'order_hour': 10,
             'is_weekend_order': 0,
             'is_holiday_season': 0,
-            'estimated_days': 5
+            'estimated_days': 12
         },
         'color': 'green'
     },
@@ -99,9 +99,9 @@ scenarios = {
             'avg_shipping_distance_km': 600,
             'max_shipping_distance_km': 800,
             'is_cross_state': 1,
-            'order_weekday': 5,  # Saturday
+            'order_weekday': 5,
             'order_month': 6,
-            'order_hour': 18,  # 6 PM
+            'order_hour': 18,
             'is_weekend_order': 1,
             'estimated_days': 10
         },
@@ -128,12 +128,12 @@ scenarios = {
             'avg_shipping_distance_km': 1500,
             'max_shipping_distance_km': 1800,
             'is_cross_state': 1,
-            'order_weekday': 6,  # Sunday
-            'order_month': 12,  # December (holiday season)
-            'order_hour': 20,  # 8 PM
+            'order_weekday': 6,
+            'order_month': 12,
+            'order_hour': 20,
             'is_weekend_order': 1,
             'is_holiday_season': 1,
-            'estimated_days': 5  # Rush!
+            'estimated_days': 5
         },
         'color': 'red'
     },
@@ -144,26 +144,26 @@ scenarios = {
             'num_items': 1,
             'num_sellers': 1,
             'num_products': 1,
-            'total_order_value': 30.0,
-            'avg_item_price': 30.0,
-            'max_item_price': 30.0,
-            'total_shipping_cost': 8.0,
-            'avg_shipping_cost': 8.0,
-            'total_weight_g': 200,
-            'avg_weight_g': 200,
-            'max_weight_g': 200,
-            'avg_length_cm': 15.0,
-            'avg_height_cm': 10.0,
+            'total_order_value': 85.0,
+            'avg_item_price': 85.0,
+            'max_item_price': 85.0,
+            'total_shipping_cost': 6.0,
+            'avg_shipping_cost': 6.0,
+            'total_weight_g': 300,
+            'avg_weight_g': 300,
+            'max_weight_g': 300,
+            'avg_length_cm': 18.0,
+            'avg_height_cm': 12.0,
             'avg_width_cm': 8.0,
-            'avg_shipping_distance_km': 150,
-            'max_shipping_distance_km': 150,
+            'avg_shipping_distance_km': 65,
+            'max_shipping_distance_km': 65,
             'is_cross_state': 0,
-            'order_weekday': 1,  # Tuesday
-            'order_month': 4,  # April
-            'order_hour': 10,  # 10 AM
+            'order_weekday': 1,
+            'order_month': 4,
+            'order_hour': 11,
             'is_weekend_order': 0,
             'is_holiday_season': 0,
-            'estimated_days': 15  # Generous time
+            'estimated_days': 18
         },
         'color': 'green'
     },
@@ -188,8 +188,8 @@ scenarios = {
             'avg_shipping_distance_km': 500,
             'max_shipping_distance_km': 600,
             'is_cross_state': 1,
-            'order_weekday': 4,  # Friday
-            'order_month': 11,  # November (Black Friday)
+            'order_weekday': 4,
+            'order_month': 11,
             'order_hour': 16,
             'is_weekend_order': 0,
             'is_holiday_season': 1,
@@ -198,7 +198,6 @@ scenarios = {
         'color': 'orange'
     }
 }
-
 # ============================================================================
 # Scenario Selection
 # ============================================================================
