@@ -294,38 +294,91 @@ if st.button("🔮 Predict Late Delivery Risk", type="primary", use_container_wi
             
             st.markdown("---")
             
-            # Recommendations
-            st.markdown("### 💡 Recommended Actions")
-            
-            if result['risk_level'] == 'HIGH':
-                st.error("""
-                **🚨 HIGH RISK - Immediate Action Required:**
-                - ⚡ Upgrade to expedited shipping
-                - 📞 Proactively contact customer to manage expectations
-                - 🏷️ Flag order for priority processing
-                - 📦 Consider splitting order across multiple warehouses
-                - 💰 Budget for potential refund/compensation
-                """)
-            
-            elif result['risk_level'] == 'MEDIUM':
-                st.warning("""
-                **⚠️ MEDIUM RISK - Monitor Closely:**
-                - 👀 Add to watchlist for daily monitoring
-                - 📧 Send automated tracking updates
-                - 🚚 Ensure optimal carrier selection
-                - 📊 Review shipping route for potential delays
-                """)
-            
-            else:
-                st.success("""
-                **✅ LOW RISK - Standard Processing:**
-                - ✓ Proceed with normal shipping workflow
-                - ✓ Standard customer communication
-                - ✓ No special intervention required
-                """)
-            
-            st.markdown("---")
-            
+                                # Recommendations based on risk level
+                    if result['risk_level'] == 'HIGH':
+                        st.error("""
+                        **🚨 HIGH RISK - Immediate Action Required:**
+                        - ⚡ Upgrade to expedited shipping immediately
+                        - 📞 Proactively contact customer with realistic timeline
+                        - 🏷️ Flag order for priority processing in warehouse
+                        - 📦 Consider splitting order across warehouses if possible
+                        - 💰 Budget for potential refund/compensation
+                        - 📊 Daily monitoring until delivery confirmed
+                        """)
+                    
+                    elif result['risk_level'] == 'MEDIUM':
+                        st.warning("""
+                        **⚠️ MEDIUM RISK - Monitor Closely:**
+                        - 👀 Add to daily monitoring watchlist
+                        - 📧 Send automated tracking updates to customer
+                        - 🚚 Ensure optimal carrier selection for route
+                        - 📊 Review shipping route for potential bottlenecks
+                        - 💬 Prepare customer service team for potential inquiries
+                        """)
+                    
+                    else:
+                        st.success("""
+                        **✅ LOW RISK - Standard Processing:**
+                        - ✓ Proceed with normal shipping workflow
+                        - ✓ Standard customer communication
+                        - ✓ No special intervention required
+                        - ✓ Monitor as part of regular batch processing
+                        """)
+                    
+                    st.markdown("---")
+                    
+                    # ============================================================
+                    # PDF Report Export
+                    # ============================================================
+                    
+                    st.markdown("### 📥 Download Report")
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        # Generate PDF report
+                        try:
+                            from utils.pdf_generator import generate_risk_report
+                            
+                            pdf_bytes = generate_risk_report(
+                                order_data=order_data,
+                                prediction_result=result,
+                                features_df=features_df
+                            )
+                            
+                            st.download_button(
+                                label="📄 Download PDF Report",
+                                data=pdf_bytes,
+                                file_name=f"risk_report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                                mime="application/pdf",
+                                use_container_width=True,
+                                type="primary"
+                            )
+                            
+                        except Exception as e:
+                            st.error(f"PDF generation error: {str(e)}")
+                    
+                    with col2:
+                        # Download prediction data as JSON
+                        import json
+                        
+                        json_data = {
+                            'timestamp': pd.Timestamp.now().isoformat(),
+                            'order_data': {k: float(v) if isinstance(v, (int, float, np.integer, np.floating)) else v 
+                                          for k, v in order_data.items()},
+                            'prediction': {k: float(v) if isinstance(v, (int, float, np.integer, np.floating)) else v 
+                                          for k, v in result.items()},
+                            'features': {col: float(features_df[col].values[0]) 
+                                       for col in features_df.columns}
+                        }
+                        
+                        st.download_button(
+                            label="📊 Download Data (JSON)",
+                            data=json.dumps(json_data, indent=2),
+                            file_name=f"prediction_data_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.json",
+                            mime="application/json",
+                            use_container_width=True
+                        )
             # Feature values used
             with st.expander("🔍 View Feature Values Used"):
                 st.dataframe(
