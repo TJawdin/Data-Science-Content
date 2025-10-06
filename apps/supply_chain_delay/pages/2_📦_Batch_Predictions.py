@@ -234,64 +234,64 @@ with col2:
 
 st.markdown("---")
 
-# REST OF YOUR BATCH PREDICTIONS CODE CONTINUES HERE...
-
 # ============================================================================
 # CSV Template Download
 # ============================================================================
 
 st.markdown("### 📄 Step 1: Prepare Your CSV File")
 
-col1, col2 = st.columns([2, 1])
+st.info("""
+**Required Columns** (minimum):
+- `num_items`, `total_order_value`, `total_shipping_cost`, `total_weight_g`
+- `avg_length_cm`, `avg_height_cm`, `avg_width_cm`
+- `avg_shipping_distance_km`, `estimated_days`
 
-with col1:
-    st.info("""
-    **Required Columns** (minimum):
-    - `num_items`, `total_order_value`, `total_shipping_cost`, `total_weight_g`
-    - `avg_length_cm`, `avg_height_cm`, `avg_width_cm`
-    - `avg_shipping_distance_km`, `estimated_days`
-    
-    **Optional Columns** (will use defaults if missing):
-    - `num_sellers`, `is_cross_state`, `order_weekday`, `order_month`, `order_hour`
-    """)
+**Optional Columns** (will use defaults if missing):
+- `num_sellers`, `is_cross_state`, `order_weekday`, `order_month`, `order_hour`
+""")
 
-with col2:
-    # Create sample CSV template
-    sample_data = {
-        'order_id': ['ORD001', 'ORD002', 'ORD003'],
-        'num_items': [2, 1, 5],
-        'num_sellers': [1, 1, 2],
-        'total_order_value': [150.0, 80.0, 300.0],
-        'total_shipping_cost': [20.0, 15.0, 35.0],
-        'total_weight_g': [2000, 500, 5000],
-        'avg_length_cm': [30.0, 20.0, 40.0],
-        'avg_height_cm': [20.0, 15.0, 30.0],
-        'avg_width_cm': [15.0, 10.0, 25.0],
-        'avg_shipping_distance_km': [500, 200, 800],
-        'is_cross_state': [1, 0, 1],
-        'order_weekday': [2, 4, 5],
-        'order_month': [6, 6, 11],
-        'order_hour': [14, 10, 18],
-        'estimated_days': [10, 7, 15]
-    }
-    
-    sample_df = pd.DataFrame(sample_data)
-    
-    # Convert to CSV
-    csv_buffer = BytesIO()
-    sample_df.to_csv(csv_buffer, index=False)
-    csv_buffer.seek(0)
-    
+# Create sample CSV template
+sample_data = {
+    'order_id': ['ORD001', 'ORD002', 'ORD003'],
+    'num_items': [2, 1, 5],
+    'num_sellers': [1, 1, 2],
+    'total_order_value': [150.0, 80.0, 300.0],
+    'total_shipping_cost': [20.0, 15.0, 35.0],
+    'total_weight_g': [2000, 500, 5000],
+    'avg_length_cm': [30.0, 20.0, 40.0],
+    'avg_height_cm': [20.0, 15.0, 30.0],
+    'avg_width_cm': [15.0, 10.0, 25.0],
+    'avg_shipping_distance_km': [500, 200, 800],
+    'is_cross_state': [1, 0, 1],
+    'order_weekday': [2, 4, 5],
+    'order_month': [6, 6, 11],
+    'order_hour': [14, 10, 18],
+    'estimated_days': [10, 7, 15]
+}
+
+sample_df = pd.DataFrame(sample_data)
+
+# Convert to CSV
+csv_buffer = BytesIO()
+sample_df.to_csv(csv_buffer, index=False)
+csv_buffer.seek(0)
+
+# Center the download button
+col_left, col_center, col_right = st.columns([1, 2, 1])
+
+with col_center:
     st.download_button(
         label="📥 Download Sample CSV Template",
         data=csv_buffer,
         file_name="sample_orders_template.csv",
         mime="text/csv",
-        use_container_width=True
+        use_container_width=True,
+        type="secondary"
     )
 
-st.markdown("---")
+st.caption("💡 The sample template contains 3 example orders for reference")
 
+st.markdown("---")
 # ============================================================================
 # File Upload
 # ============================================================================
