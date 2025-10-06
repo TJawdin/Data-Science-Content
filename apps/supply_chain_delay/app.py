@@ -12,6 +12,46 @@ import pandas as pd
 import json
 from pathlib import Path
 
+# Force light theme for better visibility
+st.set_page_config(
+    page_title="Supply Chain Delay Predictor",
+    page_icon="📦",
+    layout="wide",
+    initial_sidebar_state="expanded",
+    menu_items={
+        'Get Help': 'https://github.com/yourusername/supply-chain-delay',
+        'Report a bug': None,
+        'About': "# Supply Chain Late Delivery Risk Predictor\nML-powered risk assessment tool"
+    }
+)
+
+# Add custom CSS to ensure light theme
+st.markdown("""
+<style>
+    /* Force light theme */
+    [data-testid="stAppViewContainer"] {
+        background-color: #FFFFFF;
+    }
+    [data-testid="stSidebar"] {
+        background-color: #F0F2F6;
+    }
+    [data-testid="stMarkdownContainer"] {
+        color: #000000;
+    }
+    /* Ensure text is visible */
+    .stMarkdown, .stText, p, h1, h2, h3, h4, h5, h6 {
+        color: #262730 !important;
+    }
+    /* Fix metric labels */
+    [data-testid="stMetricLabel"] {
+        color: #262730 !important;
+    }
+    [data-testid="stMetricValue"] {
+        color: #262730 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # Page configuration
 st.set_page_config(
     page_title="Supply Chain Delay Prediction",
