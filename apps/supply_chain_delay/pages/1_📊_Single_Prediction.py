@@ -1,10 +1,11 @@
 """
-Single Order Prediction Page
-User enters order details and gets instant prediction
+Single Prediction Page
+Interactive form for predicting late delivery risk for a single order
 """
 
 import streamlit as st
 import pandas as pd
+import numpy as np
 import sys
 from pathlib import Path
 
@@ -13,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.feature_engineering import calculate_features, get_feature_descriptions
 from utils.model_loader import load_model, predict_single
+from utils.visualization import create_risk_gauge
 
 # Page config
 st.set_page_config(
@@ -21,45 +23,15 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom CSS
-st.markdown("""
-<style>
-    .risk-box-low {
-        background-color: #D5F4E6;
-        padding: 2rem;
-        border-radius: 10px;
-        border-left: 10px solid #27AE60;
-        margin: 1rem 0;
-    }
-    .risk-box-medium {
-        background-color: #FEF5E7;
-        padding: 2rem;
-        border-radius: 10px;
-        border-left: 10px solid #F39C12;
-        margin: 1rem 0;
-    }
-    .risk-box-high {
-        background-color: #FADBD8;
-        padding: 2rem;
-        border-radius: 10px;
-        border-left: 10px solid #E74C3C;
-        margin: 1rem 0;
-    }
-    .prediction-label {
-        font-size: 3rem;
-        font-weight: bold;
-        text-align: center;
-        padding: 1rem 0;
-    }
-</style>
-""", unsafe_allow_html=True)
-
 # ============================================================================
 # Header
 # ============================================================================
 
 st.title("📊 Single Order Prediction")
-st.markdown("Enter order details below to get an instant late delivery risk assessment.")
+st.markdown("""
+Enter order details below to predict late delivery risk in real-time.
+Get instant risk assessment, probability score, and actionable recommendations!
+""")
 
 st.markdown("---")
 
@@ -70,170 +42,164 @@ st.markdown("---")
 model = load_model()
 
 if model is None:
-    st.error("""
-    ⚠️ **Model Not Found**
-    
-    Please copy your trained model file from the notebook to:
-    `apps/supply_chain_delay/artifacts/best_model_*.pkl`
-    
-    Steps:
-    1. Find the model in your notebook's artifacts folder
-    2. Copy to this app's artifacts folder
-    3. Refresh this page
-    """)
+    st.error("⚠️ Model not found. Please copy your trained model to the artifacts folder.")
     st.stop()
 
 # ============================================================================
 # Input Form
 # ============================================================================
 
-st.markdown("### 📝 Order Details")
+st.markdown("## 📝 Enter Order Details")
 
-# Create two columns for inputs
-col1, col2 = st.columns(2)
-
-with col1:
-    st.markdown("#### 📦 Order Information")
+with st.form("order_input_form"):
     
-    num_items = st.number_input(
-        "Number of Items",
-        min_value=1,
-        max_value=20,
-        value=2,
-        help="How many items are in this order?"
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### 📦 Order Information")
+        
+        num_items = st.number_input(
+            "Number of Items",
+            min_value=1,
+            max_value=20,
+            value=1,
+            help="Total number of items in the order"
+        )
+        
+        num_sellers = st.number_input(
+            "Number of Sellers",
+            min_value=1,
+            max_value=10,
+            value=1,
+            help="Number of different sellers fulfilling this order"
+        )
+        
+        total_order_value = st.number_input(
+            "Total Order Value ($)",
+            min_value=0.0,
+            value=120.0,
+            step=10.0,
+            help="Total monetary value of all items"
+        )
+        
+        total_shipping_cost = st.number_input(
+            "Total Shipping Cost ($)",
+            min_value=0.0,
+            value=8.0,
+            step=5.0,
+            help="Total cost of shipping"
+        )
+        
+        st.markdown("### 📏 Physical Characteristics")
+        
+        total_weight_g = st.number_input(
+            "Total Weight (grams)",
+            min_value=0,
+            value=800,
+            step=100,
+            help="Combined weight of all items"
+        )
+        
+        col_a, col_b, col_c = st.columns(3)
+        
+        with col_a:
+            avg_length_cm = st.number_input(
+                "Avg Length (cm)",
+                min_value=0.0,
+                value=25.0,
+                step=1.0
+            )
+        
+        with col_b:
+            avg_height_cm = st.number_input(
+                "Avg Height (cm)",
+                min_value=0.0,
+                value=18.0,
+                step=1.0
+            )
+        
+        with col_c:
+            avg_width_cm = st.number_input(
+                "Avg Width (cm)",
+                min_value=0.0,
+                value=12.0,
+                step=1.0
+            )
+    
+    with col2:
+        st.markdown("### 🗺️ Geographic Information")
+        
+        avg_shipping_distance_km = st.number_input(
+            "Shipping Distance (km)",
+            min_value=0,
+            value=80,
+            step=50,
+            help="Distance from warehouse to delivery address"
+        )
+        
+        is_cross_state = st.selectbox(
+            "Cross-State Shipping?",
+            options=[0, 1],
+            format_func=lambda x: "No" if x == 0 else "Yes",
+            help="Does this order cross state boundaries?"
+        )
+        
+        st.markdown("### 📅 Timing Information")
+        
+        estimated_days = st.number_input(
+            "Estimated Delivery Days",
+            min_value=1,
+            max_value=60,
+            value=12,
+            help="Promised delivery timeframe"
+        )
+        
+        order_weekday = st.selectbox(
+            "Order Day of Week",
+            options=[0, 1, 2, 3, 4, 5, 6],
+            format_func=lambda x: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 
+                                   'Friday', 'Saturday', 'Sunday'][x],
+            index=2,
+            help="Day when order was placed"
+        )
+        
+        order_month = st.selectbox(
+            "Order Month",
+            options=list(range(1, 13)),
+            format_func=lambda x: ['January', 'February', 'March', 'April', 'May', 'June',
+                                   'July', 'August', 'September', 'October', 'November', 'December'][x-1],
+            index=4,
+            help="Month when order was placed"
+        )
+        
+        order_hour = st.slider(
+            "Order Hour (24-hour format)",
+            min_value=0,
+            max_value=23,
+            value=14,
+            help="Time of day when order was placed"
+        )
+    
+    # Submit button
+    submitted = st.form_submit_button(
+        "🎯 Predict Late Delivery Risk",
+        use_container_width=True,
+        type="primary"
     )
-    
-    num_sellers = st.number_input(
-        "Number of Sellers",
-        min_value=1,
-        max_value=10,
-        value=1,
-        help="How many different sellers are involved?"
-    )
-    
-    total_order_value = st.number_input(
-        "Total Order Value ($)",
-        min_value=0.0,
-        max_value=10000.0,
-        value=150.0,
-        step=10.0,
-        help="Total price of all items"
-    )
-    
-    total_shipping_cost = st.number_input(
-        "Total Shipping Cost ($)",
-        min_value=0.0,
-        max_value=500.0,
-        value=20.0,
-        step=5.0,
-        help="Total shipping/freight cost"
-    )
-    
-    st.markdown("#### 📏 Product Details")
-    
-    total_weight_g = st.number_input(
-        "Total Weight (grams)",
-        min_value=0,
-        max_value=50000,
-        value=2000,
-        step=100,
-        help="Total weight of all items"
-    )
-    
-    avg_length_cm = st.number_input(
-        "Average Length (cm)",
-        min_value=0.0,
-        max_value=200.0,
-        value=30.0,
-        step=5.0
-    )
-    
-    avg_height_cm = st.number_input(
-        "Average Height (cm)",
-        min_value=0.0,
-        max_value=200.0,
-        value=20.0,
-        step=5.0
-    )
-    
-    avg_width_cm = st.number_input(
-        "Average Width (cm)",
-        min_value=0.0,
-        max_value=200.0,
-        value=15.0,
-        step=5.0
-    )
-
-with col2:
-    st.markdown("#### 🗺️ Geographic Information")
-    
-    avg_shipping_distance_km = st.number_input(
-        "Shipping Distance (km)",
-        min_value=0,
-        max_value=5000,
-        value=500,
-        step=50,
-        help="Distance between seller and customer"
-    )
-    
-    is_cross_state = st.selectbox(
-        "Cross-State Shipping?",
-        options=[0, 1],
-        format_func=lambda x: "Yes" if x == 1 else "No",
-        help="Is customer in different state than seller?"
-    )
-    
-    st.markdown("#### 📅 Timing Information")
-    
-    order_weekday = st.selectbox(
-        "Order Day of Week",
-        options=[0, 1, 2, 3, 4, 5, 6],
-        format_func=lambda x: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 
-                               'Friday', 'Saturday', 'Sunday'][x],
-        index=2,
-        help="Day of the week order was placed"
-    )
-    
-    order_month = st.selectbox(
-        "Order Month",
-        options=list(range(1, 13)),
-        format_func=lambda x: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                               'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][x-1],
-        index=5,
-        help="Month order was placed"
-    )
-    
-    order_hour = st.slider(
-        "Order Hour (0-23)",
-        min_value=0,
-        max_value=23,
-        value=14,
-        help="Hour of day order was placed (0=midnight, 12=noon, 23=11pm)"
-    )
-    
-    estimated_days = st.number_input(
-        "Estimated Delivery Days",
-        min_value=1,
-        max_value=60,
-        value=10,
-        help="Promised delivery timeframe shown to customer"
-    )
-
-st.markdown("---")
 
 # ============================================================================
-# Predict Button
+# Process Prediction
 # ============================================================================
 
-if st.button("🔮 Predict Late Delivery Risk", type="primary", use_container_width=True):
+if submitted:
     
     with st.spinner("Calculating risk..."):
         
-        # Prepare input data
+        # Prepare order data
         order_data = {
             'num_items': num_items,
             'num_sellers': num_sellers,
-            'num_products': num_items,  # Simplified: assume 1 product per item
+            'num_products': num_items,
             'total_order_value': total_order_value,
             'avg_item_price': total_order_value / num_items,
             'max_item_price': total_order_value / num_items,
@@ -263,131 +229,165 @@ if st.button("🔮 Predict Late Delivery Risk", type="primary", use_container_wi
         result = predict_single(model, features_df)
         
         if result:
-            # Display result
+            
             st.markdown("---")
-            st.markdown("## 🎯 Prediction Result")
+            st.markdown("## 📊 Prediction Results")
             
-            # Risk box based on level
-            risk_box_class = f"risk-box-{result['risk_level'].lower()}"
-            
-            st.markdown(f"""
-            <div class="{risk_box_class}">
-                <div class="prediction-label" style="color: {result['risk_color']};">
-                    {result['prediction_label'].upper()}
-                </div>
-                <h2 style="text-align: center;">Risk Score: {result['risk_score']}/100</h2>
-                <h3 style="text-align: center;">Risk Level: {result['risk_level']}</h3>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Metrics
-            col1, col2, col3 = st.columns(3)
+            # Display risk gauge and metrics
+            col1, col2 = st.columns([2, 1])
             
             with col1:
-                st.metric("Prediction", result['prediction_label'])
+                # Risk gauge
+                fig = create_risk_gauge(result['risk_score'], result['risk_level'])
+                st.plotly_chart(fig, use_container_width=True)
             
             with col2:
-                st.metric("Late Probability", f"{result['probability']:.1%}")
-            
-            with col3:
-                st.metric("Risk Level", result['risk_level'])
+                st.markdown("### 📈 Key Metrics")
+                
+                st.metric(
+                    label="Prediction",
+                    value=result['prediction_label'],
+                    help="Binary prediction: Late or On-Time"
+                )
+                
+                st.metric(
+                    label="Risk Score",
+                    value=f"{result['risk_score']}/100",
+                    help="Probability-based risk score (0-100)"
+                )
+                
+                st.metric(
+                    label="Risk Level",
+                    value=result['risk_level'],
+                    help="LOW (<30), MEDIUM (30-70), HIGH (>70)"
+                )
+                
+                st.metric(
+                    label="Late Probability",
+                    value=f"{result['probability']:.1%}",
+                    help="Model confidence in late delivery"
+                )
             
             st.markdown("---")
             
-                                # Recommendations based on risk level
-                    if result['risk_level'] == 'HIGH':
-                        st.error("""
-                        **🚨 HIGH RISK - Immediate Action Required:**
-                        - ⚡ Upgrade to expedited shipping immediately
-                        - 📞 Proactively contact customer with realistic timeline
-                        - 🏷️ Flag order for priority processing in warehouse
-                        - 📦 Consider splitting order across warehouses if possible
-                        - 💰 Budget for potential refund/compensation
-                        - 📊 Daily monitoring until delivery confirmed
-                        """)
+            # Recommendations based on risk level
+            st.markdown("## 💡 Recommended Actions")
+            
+            if result['risk_level'] == 'HIGH':
+                st.error("""
+                **🚨 HIGH RISK - Immediate Action Required:**
+                - ⚡ Upgrade to expedited shipping immediately
+                - 📞 Proactively contact customer with realistic timeline
+                - 🏷️ Flag order for priority processing in warehouse
+                - 📦 Consider splitting order across warehouses if possible
+                - 💰 Budget for potential refund/compensation
+                - 📊 Daily monitoring until delivery confirmed
+                """)
+            
+            elif result['risk_level'] == 'MEDIUM':
+                st.warning("""
+                **⚠️ MEDIUM RISK - Monitor Closely:**
+                - 👀 Add to daily monitoring watchlist
+                - 📧 Send automated tracking updates to customer
+                - 🚚 Ensure optimal carrier selection for route
+                - 📊 Review shipping route for potential bottlenecks
+                - 💬 Prepare customer service team for potential inquiries
+                """)
+            
+            else:
+                st.success("""
+                **✅ LOW RISK - Standard Processing:**
+                - ✓ Proceed with normal shipping workflow
+                - ✓ Standard customer communication
+                - ✓ No special intervention required
+                - ✓ Monitor as part of regular batch processing
+                """)
+            
+            st.markdown("---")
+            
+            # ================================================================
+            # PDF Report Export
+            # ================================================================
+            
+            st.markdown("### 📥 Download Report")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                try:
+                    from utils.pdf_generator import generate_risk_report
                     
-                    elif result['risk_level'] == 'MEDIUM':
-                        st.warning("""
-                        **⚠️ MEDIUM RISK - Monitor Closely:**
-                        - 👀 Add to daily monitoring watchlist
-                        - 📧 Send automated tracking updates to customer
-                        - 🚚 Ensure optimal carrier selection for route
-                        - 📊 Review shipping route for potential bottlenecks
-                        - 💬 Prepare customer service team for potential inquiries
-                        """)
+                    pdf_bytes = generate_risk_report(
+                        order_data=order_data,
+                        prediction_result=result,
+                        features_df=features_df
+                    )
                     
-                    else:
-                        st.success("""
-                        **✅ LOW RISK - Standard Processing:**
-                        - ✓ Proceed with normal shipping workflow
-                        - ✓ Standard customer communication
-                        - ✓ No special intervention required
-                        - ✓ Monitor as part of regular batch processing
-                        """)
-                    
-                    st.markdown("---")
-                    
-                    # ============================================================
-                    # PDF Report Export
-                    # ============================================================
-                    
-                    st.markdown("### 📥 Download Report")
-                    
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        # Generate PDF report
-                        try:
-                            from utils.pdf_generator import generate_risk_report
-                            
-                            pdf_bytes = generate_risk_report(
-                                order_data=order_data,
-                                prediction_result=result,
-                                features_df=features_df
-                            )
-                            
-                            st.download_button(
-                                label="📄 Download PDF Report",
-                                data=pdf_bytes,
-                                file_name=f"risk_report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-                                mime="application/pdf",
-                                use_container_width=True,
-                                type="primary"
-                            )
-                            
-                        except Exception as e:
-                            st.error(f"PDF generation error: {str(e)}")
-                    
-                    with col2:
-                        # Download prediction data as JSON
-                        import json
-                        
-                        json_data = {
-                            'timestamp': pd.Timestamp.now().isoformat(),
-                            'order_data': {k: float(v) if isinstance(v, (int, float, np.integer, np.floating)) else v 
-                                          for k, v in order_data.items()},
-                            'prediction': {k: float(v) if isinstance(v, (int, float, np.integer, np.floating)) else v 
-                                          for k, v in result.items()},
-                            'features': {col: float(features_df[col].values[0]) 
-                                       for col in features_df.columns}
-                        }
-                        
-                        st.download_button(
-                            label="📊 Download Data (JSON)",
-                            data=json.dumps(json_data, indent=2),
-                            file_name=f"prediction_data_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.json",
-                            mime="application/json",
-                            use_container_width=True
-                        )
-            # Feature values used
-            with st.expander("🔍 View Feature Values Used"):
-                st.dataframe(
-                    features_df.T.rename(columns={0: 'Value'}),
+                    st.download_button(
+                        label="📄 Download PDF Report",
+                        data=pdf_bytes,
+                        file_name=f"risk_report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                        type="primary"
+                    )
+                except Exception as e:
+                    st.error(f"⚠️ PDF generation error: {str(e)}")
+                    st.info("Make sure fpdf2 is installed: pip install fpdf2")
+            
+            with col2:
+                import json
+                
+                json_data = {
+                    'timestamp': pd.Timestamp.now().isoformat(),
+                    'order_data': order_data,
+                    'prediction': result,
+                    'risk_score': result['risk_score'],
+                    'risk_level': result['risk_level']
+                }
+                
+                st.download_button(
+                    label="📊 Download Data (JSON)",
+                    data=json.dumps(json_data, indent=2, default=str),
+                    file_name=f"prediction_data_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    mime="application/json",
                     use_container_width=True
                 )
+            
+            st.markdown("---")
+            
+            # ================================================================
+            # Feature Breakdown
+            # ================================================================
+            
+            with st.expander("🔍 View Detailed Feature Breakdown"):
+                st.markdown("#### Calculated Features Used in Prediction")
+                
+                feature_descriptions = get_feature_descriptions()
+                
+                feature_display = []
+                for col in features_df.columns:
+                    feature_display.append({
+                        'Feature': feature_descriptions.get(col, col),
+                        'Technical Name': col,
+                        'Value': f"{features_df[col].values[0]:.2f}"
+                    })
+                
+                st.dataframe(
+                    pd.DataFrame(feature_display),
+                    use_container_width=True,
+                    height=400
+                )
+                
+                st.info("""
+                **Understanding Features:**
+                - These 29 features were engineered from your input
+                - They capture complexity, financial, physical, geographic, and temporal aspects
+                - The model uses all features to calculate risk probability
+                """)
 
 # ============================================================================
-# Sidebar Info
+# Sidebar
 # ============================================================================
 
 with st.sidebar:
@@ -404,22 +404,20 @@ with st.sidebar:
     
     st.markdown("---")
     
-    st.markdown("## 📊 Risk Levels")
-    st.markdown("""
-    - **LOW** (0-30): Proceed normally
-    - **MEDIUM** (30-70): Monitor closely
-    - **HIGH** (70-100): Take immediate action
+    st.markdown("## 💡 Tips")
+    st.success("""
+    **For accurate predictions:**
+    - Enter realistic values
+    - Consider all fields
+    - Review recommendations
+    - Download reports for records
     """)
     
     st.markdown("---")
     
-    st.markdown("## 🎯 Tips")
+    st.markdown("## 📊 Risk Levels")
     st.markdown("""
-    **High-risk factors:**
-    - Long shipping distances
-    - Multi-seller orders
-    - Heavy/bulky items
-    - Cross-state shipping
-    - Weekend/holiday orders
-    - Rush deliveries (<7 days)
+    - 🟢 **LOW** (0-30): Standard processing
+    - 🟡 **MEDIUM** (30-70): Monitor closely
+    - 🔴 **HIGH** (70-100): Immediate action
     """)
