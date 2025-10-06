@@ -34,6 +34,8 @@
   "n_samples_total": 96096,
   "n_samples_train": 72072,
   "n_samples_test": 24024,
+  "best_model": "XGBoost",
+  "best_model_auc": 0.7553,
   "model_type": "XGBoost",
   "optimization_method": "Bayesian (Optuna)",
   "optimization_trials": 80,
