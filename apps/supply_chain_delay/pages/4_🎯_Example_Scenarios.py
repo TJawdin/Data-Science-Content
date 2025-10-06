@@ -83,66 +83,7 @@ scenarios = {
         'color': 'red'
     },
     
-    "🟡 MEDIUM RISK: Multi-Seller Cross-State": {
-        'description': "Multiple items, standard shipping ($0.026/km), cross-state, moderate timeline",
-        'data': {
-            'num_items': 3,
-            'num_sellers': 2,
-            'num_products': 3,
-            'total_order_value': 150.0,
-            'avg_item_price': 50.0,
-            'max_item_price': 75.0,
-            'total_shipping_cost': 18.0,
-            'avg_shipping_cost': 6.0,
-            'total_weight_g': 2500,
-            'avg_weight_g': 833,
-            'max_weight_g': 1100,
-            'avg_length_cm': 30.0,
-            'avg_height_cm': 20.0,
-            'avg_width_cm': 15.0,
-            'avg_shipping_distance_km': 700,
-            'max_shipping_distance_km': 700,
-            'is_cross_state': 1,
-            'order_weekday': 3,
-            'order_month': 8,
-            'order_hour': 14,
-            'is_weekend_order': 0,
-            'is_holiday_season': 0,
-            'estimated_days': 9
-        },
-        'color': 'orange'
-    },
-    
-    "🟢 LOW RISK: Premium Local Delivery": {
-        'description': "High value, PREMIUM shipping ($0.167/km), very short distance, generous timeline",
-        'data': {
-            'num_items': 2,
-            'num_sellers': 1,
-            'num_products': 2,
-            'total_order_value': 380.0,
-            'avg_item_price': 190.0,
-            'max_item_price': 220.0,
-            'total_shipping_cost': 25.0,
-            'avg_shipping_cost': 12.5,
-            'total_weight_g': 800,
-            'avg_weight_g': 400,
-            'max_weight_g': 500,
-            'avg_length_cm': 20.0,
-            'avg_height_cm': 15.0,
-            'avg_width_cm': 10.0,
-            'avg_shipping_distance_km': 150,
-            'max_shipping_distance_km': 150,
-            'is_cross_state': 0,
-            'order_weekday': 1,
-            'order_month': 4,
-            'order_hour': 10,
-            'is_weekend_order': 0,
-            'is_holiday_season': 0,
-            'estimated_days': 10
-        },
-        'color': 'green'
-    },
-    
+       
     "🟢 LOW RISK: Same-City Express": {
         'description': "Local delivery, premium service, comfortable timeline",
         'data': {
