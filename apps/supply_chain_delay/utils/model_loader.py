@@ -46,58 +46,61 @@ def load_model():
         return None
 
 
-def predict_single(model, features_df):
+def predict_batch(model, features_list):
     """
-    Make prediction for a single order
+    Make predictions for multiple orders
     
     Parameters:
     -----------
     model : trained model
-    features_df : pd.DataFrame with 30 features
+    features_list : list of pd.DataFrame (each with 1 row × 30 features)
     
     Returns:
     --------
-    dict with prediction, probability, and risk score
+    pd.DataFrame with predictions and risk scores
     """
     try:
-        # Get prediction
-        prediction = model.predict(features_df)[0]
+        # Combine all features into one DataFrame
+        features_df = pd.concat(features_list, ignore_index=True)
         
-        # Get probability
+        # Get predictions
+        predictions = model.predict(features_df)
+        
+        # Get probabilities
         if hasattr(model, 'predict_proba'):
-            probabilities = model.predict_proba(features_df)[0]
-            prob_late = probabilities[1]
+            probabilities = model.predict_proba(features_df)
+            prob_late = probabilities[:, 1]
         else:
-            # Fallback if no predict_proba
-            prob_late = prediction
+            prob_late = predictions
         
-        # Calculate risk score (0-100)
-        risk_score = int(prob_late * 100)
+        # Calculate risk scores
+        risk_scores = (prob_late * 100).astype(int)
         
-        # Determine risk level
-        if risk_score < 30:
-            risk_level = "LOW"
-            risk_color = "green"
-        elif risk_score < 70:
-            risk_level = "MEDIUM"
-            risk_color = "orange"
-        else:
-            risk_level = "HIGH"
-            risk_color = "red"
+        # Determine risk levels
+        def get_risk_level(score):
+            if score < 30:
+                return 'LOW'
+            elif score < 70:
+                return 'MEDIUM'
+            else:
+                return 'HIGH'
         
-        return {
-            'prediction': int(prediction),
-            'prediction_label': 'Late' if prediction == 1 else 'On-Time',
-            'probability': float(prob_late),
-            'risk_score': risk_score,
-            'risk_level': risk_level,
-            'risk_color': risk_color
-        }
+        risk_levels = [get_risk_level(score) for score in risk_scores]
+        
+        # Create results dataframe (lowercase column names for consistency)
+        results = pd.DataFrame({
+            'prediction': predictions,
+            'prediction_label': ['Late' if p == 1 else 'On-Time' for p in predictions],
+            'probability': prob_late,
+            'risk_score': risk_scores,
+            'risk_level': risk_levels
+        })
+        
+        return results
     
     except Exception as e:
-        st.error(f"❌ Prediction error: {str(e)}")
+        st.error(f"❌ Batch prediction error: {str(e)}")
         return None
-
 
 def predict_batch(model, features_df):
     """
