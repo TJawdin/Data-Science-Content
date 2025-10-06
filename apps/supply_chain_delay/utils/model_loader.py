@@ -9,7 +9,7 @@ import pickle
 from pathlib import Path
 
 # Model path
-MODEL_PATH = Path(__file__).parent.parent / 'artifacts' / 'best_model.pkl'
+MODEL_PATH = Path(__file__).parent.parent / 'artifacts' / 'best_model_xgboost.pkl'
 
 @st.cache_resource
 def load_model():
