@@ -225,8 +225,8 @@ col1, col2 = st.columns(2)
 with col1:
     st.info("""
     **Project:** Data Science Capstone - Supply Chain Delay Prediction  
-    **Author:** TJawdin  
-    **Date:** October 2025  
+    **Author:** Trecorrus Jordan 
+    **Date:** November 2025  
     **Dataset:** Olist Brazilian E-Commerce (100k+ orders)
     """)
 
