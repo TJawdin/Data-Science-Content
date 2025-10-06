@@ -1,11 +1,30 @@
+# Core Streamlit
 streamlit
+
+# Data Science
 pandas
 numpy
+
+# Machine Learning
 scikit-learn
 xgboost
 catboost
+joblib
+
+# Model Explainability
 shap
+
+# Visualization - Standard
 matplotlib
 seaborn
-joblib
+
+# Visualization - Interactive
 plotly
+altair
+
+# Geographic Visualization
+folium
+streamlit-folium
+
+# PDF Export (optional)
+reportlab
