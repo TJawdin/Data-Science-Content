@@ -452,41 +452,166 @@ if st.button("🔄 Compare Orders", type="primary", use_container_width=True):
             # Key Differences Analysis
             # ================================================================
             
-            st.markdown("## 🔍 Key Differences Analysis")
-            
-            if num_orders == 2:
-                order1 = results[1]
-                order2 = results[2]
-                
-                risk_diff = order2['prediction']['risk_score'] - order1['prediction']['risk_score']
-                
-                if abs(risk_diff) < 10:
-                    st.info(f"""
-                    **Similar Risk Levels** (Difference: {abs(risk_diff):.0f} points)
-                    
-                    Both orders have comparable late delivery risk despite different characteristics.
-                    """)
-                elif risk_diff > 0:
-                    st.error(f"""
-                    **Order 2 is {abs(risk_diff):.0f} points HIGHER RISK than Order 1**
-                    
-                    **Main drivers of increased risk:**
-                    - {'✓ More items/sellers (increased complexity)' if order2['data']['num_items'] > order1['data']['num_items'] else ''}
-                    - {'✓ Longer shipping distance' if order2['data']['avg_shipping_distance_km'] > order1['data']['avg_shipping_distance_km'] else ''}
-                    - {'✓ Shorter delivery window (rush order)' if order2['data']['estimated_days'] < order1['data']['estimated_days'] else ''}
-                    - {'✓ Weekend/holiday timing' if order2['data']['is_weekend_order'] > order1['data']['is_weekend_order'] else ''}
-                    """)
-                else:
-                    st.success(f"""
-                    **Order 1 is {abs(risk_diff):.0f} points HIGHER RISK than Order 2**
-                    
-                    **Main drivers of increased risk:**
-                    - {'✓ More items/sellers (increased complexity)' if order1['data']['num_items'] > order2['data']['num_items'] else ''}
-                    - {'✓ Longer shipping distance' if order1['data']['avg_shipping_distance_km'] > order2['data']['avg_shipping_distance_km'] else ''}
-                    - {'✓ Shorter delivery window (rush order)' if order1['data']['estimated_days'] < order2['data']['estimated_days'] else ''}
-                    - {'✓ Weekend/holiday timing' if order1['data']['is_weekend_order'] > order2['data']['is_weekend_order'] else ''}
-                    """)
+            # ================================================================
+# Key Differences Analysis
+# ================================================================
 
+st.markdown("## 🔍 Key Differences Analysis")
+
+if num_orders == 2:
+    order1 = results[1]
+    order2 = results[2]
+    
+    risk_diff = order2['prediction']['risk_score'] - order1['prediction']['risk_score']
+    
+    # Identify key differences
+    differences = []
+    
+    # Check complexity
+    if order2['data']['num_items'] > order1['data']['num_items']:
+        diff = order2['data']['num_items'] - order1['data']['num_items']
+        differences.append(f"✓ Order 2 has {diff} more items (increased complexity)")
+    elif order1['data']['num_items'] > order2['data']['num_items']:
+        diff = order1['data']['num_items'] - order2['data']['num_items']
+        differences.append(f"✓ Order 1 has {diff} more items (increased complexity)")
+    
+    # Check distance
+    if order2['data']['avg_shipping_distance_km'] > order1['data']['avg_shipping_distance_km']:
+        diff = order2['data']['avg_shipping_distance_km'] - order1['data']['avg_shipping_distance_km']
+        differences.append(f"✓ Order 2 has {diff:.0f}km longer shipping distance")
+    elif order1['data']['avg_shipping_distance_km'] > order2['data']['avg_shipping_distance_km']:
+        diff = order1['data']['avg_shipping_distance_km'] - order2['data']['avg_shipping_distance_km']
+        differences.append(f"✓ Order 1 has {diff:.0f}km longer shipping distance")
+    
+    # Check timeline
+    if order2['data']['estimated_days'] < order1['data']['estimated_days']:
+        diff = order1['data']['estimated_days'] - order2['data']['estimated_days']
+        differences.append(f"✓ Order 2 has {diff} fewer days (rush order)")
+    elif order1['data']['estimated_days'] < order2['data']['estimated_days']:
+        diff = order2['data']['estimated_days'] - order1['data']['estimated_days']
+        differences.append(f"✓ Order 1 has {diff} fewer days (rush order)")
+    
+    # Check weekend
+    if order2['data']['is_weekend_order'] > order1['data']['is_weekend_order']:
+        differences.append("✓ Order 2 is placed on weekend (higher risk)")
+    elif order1['data']['is_weekend_order'] > order2['data']['is_weekend_order']:
+        differences.append("✓ Order 1 is placed on weekend (higher risk)")
+    
+    # Check holiday season
+    if order2['data']['is_holiday_season'] > order1['data']['is_holiday_season']:
+        differences.append("✓ Order 2 is during holiday season (higher risk)")
+    elif order1['data']['is_holiday_season'] > order2['data']['is_holiday_season']:
+        differences.append("✓ Order 1 is during holiday season (higher risk)")
+    
+    # Check cross-state
+    if order2['data']['is_cross_state'] > order1['data']['is_cross_state']:
+        differences.append("✓ Order 2 requires cross-state shipping")
+    elif order1['data']['is_cross_state'] > order2['data']['is_cross_state']:
+        differences.append("✓ Order 1 requires cross-state shipping")
+    
+    # Check sellers
+    if order2['data']['num_sellers'] > order1['data']['num_sellers']:
+        diff = order2['data']['num_sellers'] - order1['data']['num_sellers']
+        differences.append(f"✓ Order 2 has {diff} more sellers (coordination complexity)")
+    elif order1['data']['num_sellers'] > order2['data']['num_sellers']:
+        diff = order1['data']['num_sellers'] - order2['data']['num_sellers']
+        differences.append(f"✓ Order 1 has {diff} more sellers (coordination complexity)")
+    
+    # Check weight
+    if order2['data']['total_weight_g'] > order1['data']['total_weight_g'] * 1.5:
+        differences.append(f"✓ Order 2 is significantly heavier ({order2['data']['total_weight_g']}g vs {order1['data']['total_weight_g']}g)")
+    elif order1['data']['total_weight_g'] > order2['data']['total_weight_g'] * 1.5:
+        differences.append(f"✓ Order 1 is significantly heavier ({order1['data']['total_weight_g']}g vs {order2['data']['total_weight_g']}g)")
+    
+    # Display analysis
+    if abs(risk_diff) < 10:
+        st.info(f"""
+        **Similar Risk Levels** (Difference: {abs(risk_diff):.0f} points)
+        
+        Both orders have comparable late delivery risk despite some different characteristics.
+        
+        **Notable Differences:**
+        {chr(10).join(['- ' + d for d in differences]) if differences else '- Orders are very similar across all key dimensions'}
+        """)
+    
+    elif risk_diff > 0:
+        st.error(f"""
+        **⚠️ Order 2 is {abs(risk_diff):.0f} points HIGHER RISK than Order 1**
+        
+        **Risk Scores:**
+        - Order 1: {order1['prediction']['risk_score']}/100 ({order1['prediction']['risk_level']})
+        - Order 2: {order2['prediction']['risk_score']}/100 ({order2['prediction']['risk_level']})
+        
+        **Main drivers of increased risk in Order 2:**
+        {chr(10).join(['- ' + d for d in differences]) if differences else '- Multiple small factors combine to increase risk'}
+        
+        **Recommendation:** Order 2 requires closer monitoring and potential intervention.
+        """)
+    
+    else:
+        st.error(f"""
+        **⚠️ Order 1 is {abs(risk_diff):.0f} points HIGHER RISK than Order 2**
+        
+        **Risk Scores:**
+        - Order 1: {order1['prediction']['risk_score']}/100 ({order1['prediction']['risk_level']})
+        - Order 2: {order2['prediction']['risk_score']}/100 ({order2['prediction']['risk_level']})
+        
+        **Main drivers of increased risk in Order 1:**
+        {chr(10).join(['- ' + d for d in differences]) if differences else '- Multiple small factors combine to increase risk'}
+        
+        **Recommendation:** Order 1 requires closer monitoring and potential intervention.
+        """)
+    
+    # Side-by-side metrics for easy comparison
+    st.markdown("---")
+    st.markdown("### 📊 Quick Comparison")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### 🛒 Order 1")
+        st.metric("Items", order1['data']['num_items'])
+        st.metric("Sellers", order1['data']['num_sellers'])
+        st.metric("Value", f"${order1['data']['total_order_value']:.2f}")
+        st.metric("Distance", f"{order1['data']['avg_shipping_distance_km']}km")
+        st.metric("Timeline", f"{order1['data']['estimated_days']} days")
+        st.metric("**RISK SCORE**", f"{order1['prediction']['risk_score']}/100", 
+                 delta=f"{order1['prediction']['risk_level']}")
+    
+    with col2:
+        st.markdown("#### 🛒 Order 2")
+        st.metric("Items", order2['data']['num_items'])
+        st.metric("Sellers", order2['data']['num_sellers'])
+        st.metric("Value", f"${order2['data']['total_order_value']:.2f}")
+        st.metric("Distance", f"{order2['data']['avg_shipping_distance_km']}km")
+        st.metric("Timeline", f"{order2['data']['estimated_days']} days")
+        st.metric("**RISK SCORE**", f"{order2['prediction']['risk_score']}/100",
+                 delta=f"{risk_diff:+.0f} vs Order 1",
+                 delta_color="inverse")
+
+elif num_orders == 3:
+    # For 3-way comparison
+    st.info("""
+    **3-Way Comparison Analysis**
+    
+    Review the charts above to understand differences across all three orders.
+    Key metrics table and radar chart provide comprehensive comparison.
+    """)
+    
+    # Show risk ranking
+    risk_ranking = sorted(
+        [(num, res['prediction']['risk_score']) for num, res in results.items()],
+        key=lambda x: x[1],
+        reverse=True
+    )
+    
+    st.success(f"""
+    **Risk Ranking (Highest to Lowest):**
+    
+    1. 🥇 Order {risk_ranking[0][0]}: {risk_ranking[0][1]}/100
+    2. 🥈 Order {risk_ranking[1][0]}: {risk_ranking[1][1]}/100
+    3. 🥉 Order {risk_ranking[2][0]}: {risk_ranking[2][1]}/100
+    """)
 # ============================================================================
 # Sidebar
 # ============================================================================
