@@ -38,7 +38,7 @@ def load_model():
         model_path = model_files[0]
         model = joblib.load(model_path)
         
-        st.success(f"✅ Model loaded: {model_path.name}")
+        
         return model
     
     except Exception as e:
