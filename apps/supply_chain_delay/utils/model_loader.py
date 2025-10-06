@@ -25,19 +25,14 @@ def load_model():
         with open(MODEL_PATH, 'rb') as f:
             model = pickle.load(f)
         
-        # Debug info
-        print(f"✅ Model loaded successfully from: {MODEL_PATH}")
-        print(f"   Model type: {type(model)}")
-        
         return model
         
     except FileNotFoundError:
-        st.error(f"❌ Model file not found at: {MODEL_PATH}")
-        st.info("Please ensure your trained model is saved as 'best_model.pkl' in the artifacts folder.")
+        st.warning("Model file not found. Please ensure your trained model is in the artifacts folder.")
         return None
         
     except Exception as e:
-        st.error(f"❌ Error loading model: {str(e)}")
+        st.error(f"Error loading model: {str(e)}")
         return None
 
 
