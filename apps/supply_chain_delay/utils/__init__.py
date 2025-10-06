@@ -1,13 +1,6 @@
 """
-Utility functions for Supply Chain Delay Prediction app
+Utility functions for supply chain delay prediction
 """
 
-from .feature_engineering import calculate_features
-from .model_loader import load_model, predict_single, predict_batch
-
-__all__ = [
-    'calculate_features',
-    'load_model',
-    'predict_single',
-    'predict_batch'
-]
+# Empty init file - let modules import directly
+# This prevents circular import issues
