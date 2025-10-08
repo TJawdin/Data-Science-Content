@@ -119,6 +119,38 @@ with col3:
 
 st.markdown("---")
 
+# Business Impact
+st.markdown("### 💼 Business Impact")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("""
+    <div class="success-box">
+    <h4>📈 Expected Benefits</h4>
+    <ul>
+        <li><strong>20% reduction</strong> in late deliveries</li>
+        <li><strong>$400K+ annual savings</strong> in refunds and lost customers</li>
+        <li><strong>15% improvement</strong> in customer satisfaction</li>
+        <li><strong>Proactive intervention</strong> on high-risk orders</li>
+    </ul>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col2:
+    st.markdown("""
+    <div class="info-box">
+    <h4>🎯 Use Cases</h4>
+    <ul>
+        <li><strong>Operations:</strong> Prioritize high-risk orders</li>
+        <li><strong>Logistics:</strong> Optimize carrier selection</li>
+        <li><strong>Customer Service:</strong> Proactive communication</li>
+        <li><strong>Finance:</strong> Budget for expedited shipping</li>
+    </ul>
+    </div>
+    """, unsafe_allow_html=True)
+    
+st.markdown("---")
 # Key Metrics
 st.markdown("### 📊 Model Performance")
 
@@ -158,39 +190,7 @@ with col2:
     st.metric("Optimal Threshold", "18.44%")
 with col3:
     st.metric("Optimization Method", "Bayesian (Optuna)")
-    
-st.markdown("---")
 
-# Business Impact
-st.markdown("### 💼 Business Impact")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    st.markdown("""
-    <div class="success-box">
-    <h4>📈 Expected Benefits</h4>
-    <ul>
-        <li><strong>20% reduction</strong> in late deliveries</li>
-        <li><strong>$400K+ annual savings</strong> in refunds and lost customers</li>
-        <li><strong>15% improvement</strong> in customer satisfaction</li>
-        <li><strong>Proactive intervention</strong> on high-risk orders</li>
-    </ul>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col2:
-    st.markdown("""
-    <div class="info-box">
-    <h4>🎯 Use Cases</h4>
-    <ul>
-        <li><strong>Operations:</strong> Prioritize high-risk orders</li>
-        <li><strong>Logistics:</strong> Optimize carrier selection</li>
-        <li><strong>Customer Service:</strong> Proactive communication</li>
-        <li><strong>Finance:</strong> Budget for expedited shipping</li>
-    </ul>
-    </div>
-    """, unsafe_allow_html=True)
 
 st.markdown("---")
 
