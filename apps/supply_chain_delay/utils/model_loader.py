@@ -8,6 +8,9 @@ import pandas as pd
 from pathlib import Path
 import streamlit as st
 
+# Optimized threshold from model training
+OPTIMAL_THRESHOLD = 0.1844  # 18.44%
+
 @st.cache_resource
 def load_model():
     """
@@ -59,16 +62,16 @@ def predict_single(model, features_df):
     dict with prediction, probability, and risk score
     """
     try:
-        # Get prediction
-        prediction = model.predict(features_df)[0]
-        
-        # Get probability
+        # Get probability (this is what we need for custom threshold)
         if hasattr(model, 'predict_proba'):
             probabilities = model.predict_proba(features_df)[0]
             prob_late = probabilities[1]
         else:
             # Fallback if no predict_proba
-            prob_late = prediction
+            prob_late = model.predict(features_df)[0]
+        
+        # Apply custom threshold (18.44%) instead of default 50%
+        prediction = 1 if prob_late >= OPTIMAL_THRESHOLD else 0
         
         # Calculate risk score (0-100)
         risk_score = int(prob_late * 100)
@@ -113,15 +116,15 @@ def predict_batch(model, features_df):
     pd.DataFrame with predictions and risk scores
     """
     try:
-        # Get predictions
-        predictions = model.predict(features_df)
-        
-        # Get probabilities
+        # Get probabilities (this is what we need for custom threshold)
         if hasattr(model, 'predict_proba'):
             probabilities = model.predict_proba(features_df)
             prob_late = probabilities[:, 1]
         else:
-            prob_late = predictions
+            prob_late = model.predict(features_df)
+        
+        # Apply custom threshold (18.44%) instead of default 50%
+        predictions = (prob_late >= OPTIMAL_THRESHOLD).astype(int)
         
         # Calculate risk scores
         risk_scores = (prob_late * 100).astype(int)
