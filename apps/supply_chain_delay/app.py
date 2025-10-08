@@ -76,6 +76,18 @@ with col2:
 
 st.markdown("---")
 
+# How to Use
+st.markdown("### 🚀 How to Use This App")
+
+st.markdown("""
+1. **📊 Single Prediction**: Use the sidebar to navigate to the Single Prediction page and enter order details
+2. **📦 Batch Predictions**: Upload a CSV file with multiple orders for bulk processing
+3. **🔍 Model Insights**: Explore what features drive late delivery predictions
+
+**Navigation:** Use the sidebar on the left to switch between pages.
+""")
+
+st.markdown("---")
 # Key Metrics
 st.markdown("### 📊 Model Performance")
 
