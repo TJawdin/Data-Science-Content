@@ -64,7 +64,7 @@ def predict_single(model, features_df):
         
         # Get probability
         if hasattr(model, 'predict_proba'):
-            probabilities = model.predict_proba(features_df)[0]
+            prob_late = model.predict_proba(features_df)[0]
         else:
             # Fallback if no predict_proba
             prob_late = model.predict(features_df)[0]
