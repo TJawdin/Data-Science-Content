@@ -86,6 +86,36 @@ st.markdown("""
 
 **Navigation:** Use the sidebar on the left to switch between pages.
 """)
+# Features Section
+st.markdown("### ✨ Key Features")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.markdown("""
+    <div class="metric-card">
+    <h4>📊 Single Prediction</h4>
+    <p>Enter order details to get an instant late delivery risk assessment with explanations.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col2:
+    st.markdown("""
+    <div class="metric-card">
+    <h4>📦 Batch Processing</h4>
+    <p>Upload a CSV file to analyze multiple orders at once and download results.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col3:
+    st.markdown("""
+    <div class="metric-card">
+    <h4>🔍 Model Insights</h4>
+    <p>Explore feature importance, SHAP analysis, and understand what drives predictions.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.markdown("---")
 
 st.markdown("---")
 # Key Metrics
