@@ -60,7 +60,7 @@ def predict_single(model, features_df):
     """
     try:
         # Get prediction
-        prediction = model.predict(features_df)[0]
+        #prediction = model.predict(features_df)[0]
         
         # Get probability
         if hasattr(model, 'predict_proba'):
