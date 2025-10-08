@@ -89,7 +89,7 @@ with st.form("order_input_form"):
             "Total Shipping Cost ($)",
             min_value=0.0,
             value=8.0,
-            step=5.0,
+            step=1.0,
             help="Total cost of shipping"
         )
         
@@ -262,7 +262,7 @@ if submitted:
                 st.metric(
                     label="Risk Level",
                     value=result['risk_level'],
-                    help="LOW (<30), MEDIUM (30-70), HIGH (>70)"
+                    help="LOW (<10), MEDIUM (10-26), HIGH (>26)"
                 )
                 
                 st.metric(
