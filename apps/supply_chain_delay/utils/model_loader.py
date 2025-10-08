@@ -58,14 +58,17 @@ def predict_single(model, features_df):
     --------
     dict with prediction, probability, and risk score
     """
-   try:
-    # Get probability of LATE class
-    if hasattr(model, 'predict_proba'):
-        prob_late = model.predict_proba(features_df)[0][1]
-    else:
-        prob_late = model.predict(features_df)[0]
-    # Custom threshold
-    prediction = int(prob_late >= 0.1844)
+    try:
+        # Get prediction
+        prediction = model.predict(features_df)[0]
+        
+        # Get probability
+        if hasattr(model, 'predict_proba'):
+            probabilities = model.predict_proba(features_df)[0]
+            prob_late = probabilities[1]
+        else:
+            # Fallback if no predict_proba
+            prob_late = prediction
         
         # Calculate risk score (0-100)
         risk_score = int(prob_late * 100)
