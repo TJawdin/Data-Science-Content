@@ -87,10 +87,10 @@ st.markdown("""
 **Navigation:** Use the sidebar on the left to switch between pages.
 """)
 
-col1, col2, col3 = st.columns(3)
 
 # Features Section
 st.markdown("### ✨ Key Features")
+col1, col2, col3 = st.columns(3)
 
 with col1:
     st.markdown("""
