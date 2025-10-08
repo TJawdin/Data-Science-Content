@@ -21,10 +21,7 @@ st.set_page_config(
     page_icon="🗺️",
     layout="wide"
 )
-from utils.theme_adaptive import apply_adaptive_theme
 
-# Apply theme right after page config
-apply_adaptive_theme()
 # ============================================================================
 # Header
 # ============================================================================
@@ -59,9 +56,9 @@ def get_brazil_locations():
         
         # High-risk remote areas
         {'city': 'Manaus', 'state': 'AM', 'lat': -3.1190, 'lng': -60.0217, 
-         'type': 'customer', 'late_rate': 19.3, 'orders': 5000},
+         'type': 'customer', 'late_rate': 11.3, 'orders': 5000},
         {'city': 'Belém', 'state': 'PA', 'lat': -1.4558, 'lng': -48.5039, 
-         'type': 'customer', 'late_rate': 18.8, 'orders': 4500},
+         'type': 'customer', 'late_rate': 10.8, 'orders': 4500},
         {'city': 'Recife', 'state': 'PE', 'lat': -8.0476, 'lng': -34.8770, 
          'type': 'customer', 'late_rate': 8.3, 'orders': 8000},
         {'city': 'Fortaleza', 'state': 'CE', 'lat': -3.7319, 'lng': -38.5267, 
@@ -102,8 +99,8 @@ with col1:
 with col2:
     show_markers = st.checkbox("Show City Markers", value=True)
 
-with col3
-    show_markers = st.checkbox("Show Risk Level", value=True)
+with col3:
+    show_labels = st.checkbox("Show Risk Labels", value=True)
 
 st.markdown("---")
 
@@ -270,9 +267,9 @@ def create_brazil_map(view_type, show_markers, show_labels):
                 background-color: white; z-index:9999; font-size:14px;
                 border:2px solid grey; border-radius: 5px; padding: 10px">
     <p style="margin: 0; font-weight: bold;">Risk Levels</p>
-    <p style="margin: 5px 0;"><span style="color: green;">●</span> Low Risk</p>
-    <p style="margin: 5px 0;"><span style="color: orange;">●</span> Medium Risk</p>
-    <p style="margin: 5px 0;"><span style="color: red;">●</span> High Risk</p>
+    <p style="margin: 5px 0;"><span style="color: green;">●</span> Low Risk (&lt;6%)</p>
+    <p style="margin: 5px 0;"><span style="color: orange;">●</span> Medium Risk (6-9%)</p>
+    <p style="margin: 5px 0;"><span style="color: red;">●</span> High Risk (&gt;9%)</p>
     </div>
     '''
     m.get_root().html.add_child(folium.Element(legend_html))
@@ -423,9 +420,9 @@ with st.sidebar:
     st.markdown("## 📦 Legend")
     st.markdown("""
     **Markers:**
-    - 🟢 Green: Low Risk (<10%)
-    - 🟠 Orange: Medium (10-25%)
-    - 🔴 Red: High Risk (>25%)
+    - 🟢 Green: Low Risk (<6%)
+    - 🟠 Orange: Medium (6-9%)
+    - 🔴 Red: High Risk (>9%)
     
     **Icons:**
     - 🏭 Warehouse/DC
