@@ -87,6 +87,7 @@ st.markdown("""
 **Navigation:** Use the sidebar on the left to switch between pages.
 """)
 
+st.markdown("---")
 
 # Features Section
 st.markdown("### ✨ Key Features")
@@ -118,7 +119,6 @@ with col3:
 
 st.markdown("---")
 
-st.markdown("---")
 # Key Metrics
 st.markdown("### 📊 Model Performance")
 
@@ -150,8 +150,6 @@ with col4:
         value=f"{metadata.get('n_samples_train', 0):,}"
     )
 
-st.markdown("---")
-
 st.markdown("### 🏆 Optimization Results")
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -161,6 +159,7 @@ with col2:
 with col3:
     st.metric("Optimization Method", "Bayesian (Optuna)")
     
+st.markdown("---")
 
 # Business Impact
 st.markdown("### 💼 Business Impact")
