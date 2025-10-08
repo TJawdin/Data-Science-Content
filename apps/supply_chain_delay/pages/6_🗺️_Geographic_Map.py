@@ -59,9 +59,9 @@ def get_brazil_locations():
         
         # High-risk remote areas
         {'city': 'Manaus', 'state': 'AM', 'lat': -3.1190, 'lng': -60.0217, 
-         'type': 'customer', 'late_rate': 11.3, 'orders': 5000},
+         'type': 'customer', 'late_rate': 19.3, 'orders': 5000},
         {'city': 'Belém', 'state': 'PA', 'lat': -1.4558, 'lng': -48.5039, 
-         'type': 'customer', 'late_rate': 10.8, 'orders': 4500},
+         'type': 'customer', 'late_rate': 18.8, 'orders': 4500},
         {'city': 'Recife', 'state': 'PE', 'lat': -8.0476, 'lng': -34.8770, 
          'type': 'customer', 'late_rate': 8.3, 'orders': 8000},
         {'city': 'Fortaleza', 'state': 'CE', 'lat': -3.7319, 'lng': -38.5267, 
