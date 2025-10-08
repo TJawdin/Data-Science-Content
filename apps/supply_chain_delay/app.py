@@ -98,7 +98,7 @@ with col1:
     <p>Enter order details to get an instant late delivery risk assessment with explanations.</p>
     </div>
     """, unsafe_allow_html=True)
-
+col1, col2, col3, col4 = st.columns(4)
 with col2:
     st.markdown("""
     <div class="metric-card">
