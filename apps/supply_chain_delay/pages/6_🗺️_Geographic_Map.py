@@ -90,7 +90,7 @@ locations = get_brazil_locations()
 
 st.markdown("## 🎛️ Map Controls")
 
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 
 with col1:
     map_view = st.selectbox(
@@ -101,6 +101,8 @@ with col1:
 
 with col2:
     show_markers = st.checkbox("Show City Markers", value=True)
+
+with col3
 
 
 st.markdown("---")
