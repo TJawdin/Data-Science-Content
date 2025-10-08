@@ -65,10 +65,10 @@ def predict_single(model, features_df):
         # Get probability
         if hasattr(model, 'predict_proba'):
             probabilities = model.predict_proba(features_df)[0]
-            prob_late = probabilities[1]
         else:
             # Fallback if no predict_proba
-            prob_late = prediction
+            prob_late = model.predict(features_df)[0]
+        prediction = int(prob_late >= 0.1844)
         
         # Calculate risk score (0-100)
         risk_score = int(prob_late * 100)
