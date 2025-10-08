@@ -423,9 +423,9 @@ with st.sidebar:
     st.markdown("## 📦 Legend")
     st.markdown("""
     **Markers:**
-    - 🟢 Green: Low Risk (<6%)
-    - 🟠 Orange: Medium (6-9%)
-    - 🔴 Red: High Risk (>9%)
+    - 🟢 Green: Low Risk (<10%)
+    - 🟠 Orange: Medium (10-25%)
+    - 🔴 Red: High Risk (>25%)
     
     **Icons:**
     - 🏭 Warehouse/DC
