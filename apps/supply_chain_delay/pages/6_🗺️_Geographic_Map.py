@@ -169,17 +169,17 @@ def create_brazil_map(view_type, show_markers, show_labels):
                 ).add_to(m)
             
             # Add risk labels
-            if show_labels:
-                folium.Marker(
-                    location=[row['lat'], row['lng']],
-                    icon=folium.DivIcon(html=f"""
-                        <div style="font-size: 10px; color: {color}; font-weight: bold; 
-                                    text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, 
-                                    -1px 1px 0 #fff, 1px 1px 0 #fff;">
-                            {row['city']}<br>{row['late_rate']:.1f}%
-                        </div>
-                    """)
-                ).add_to(m)
+            #if show_labels:
+                #folium.Marker(
+                    #location=[row['lat'], row['lng']],
+                    #icon=folium.DivIcon(html=f"""
+                        #<div style="font-size: 10px; color: {color}; font-weight: bold; 
+                                    #text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, 
+                                    #-1px 1px 0 #fff, 1px 1px 0 #fff;">
+                            #{row['city']}<br>{row['late_rate']:.1f}%
+                        #</div>
+                    #""")
+                #).add_to(m)
     
     # ========== SHIPPING ROUTES VIEW ==========
     elif view_type == "Shipping Routes":
