@@ -267,9 +267,9 @@ def create_brazil_map(view_type, show_markers, show_labels):
                 background-color: white; z-index:9999; font-size:14px;
                 border:2px solid grey; border-radius: 5px; padding: 10px">
     <p style="margin: 0; font-weight: bold;">Risk Levels</p>
-    <p style="margin: 5px 0;"><span style="color: green;">●</span> Low Risk (&lt;6%)</p>
-    <p style="margin: 5px 0;"><span style="color: orange;">●</span> Medium Risk (6-9%)</p>
-    <p style="margin: 5px 0;"><span style="color: red;">●</span> High Risk (&gt;9%)</p>
+    <p style="margin: 5px 0;"><span style="color: green;">●</span> Low Risk</p>
+    <p style="margin: 5px 0;"><span style="color: orange;">●</span> Medium Risk</p>
+    <p style="margin: 5px 0;"><span style="color: red;">●</span> High Risk</p>
     </div>
     '''
     m.get_root().html.add_child(folium.Element(legend_html))
@@ -420,9 +420,9 @@ with st.sidebar:
     st.markdown("## 📦 Legend")
     st.markdown("""
     **Markers:**
-    - 🟢 Green: Low Risk (<6%)
-    - 🟠 Orange: Medium (6-9%)
-    - 🔴 Red: High Risk (>9%)
+    - 🟢 Green: Low Risk
+    - 🟠 Orange: Medium
+    - 🔴 Red: High Risk
     
     **Icons:**
     - 🏭 Warehouse/DC
