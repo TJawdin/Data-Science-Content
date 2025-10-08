@@ -103,7 +103,7 @@ with col2:
     show_markers = st.checkbox("Show City Markers", value=True)
 
 with col3
-
+    show_markers = st.checkbox("Show Risk Level", value=True)
 
 st.markdown("---")
 
