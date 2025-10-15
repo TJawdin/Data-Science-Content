@@ -112,8 +112,8 @@ with col2:
 with col3:
     st.markdown("""
     <div class="metric-card">
-    <h4>🔍 Model Insights</h4>
-    <p>Explore feature importance, SHAP analysis, and understand what drives predictions.</p>
+    <h4>🔍 Geographic Shipping Analysis</h4>
+    <p>Interactive map visualization of shipping routes, risk zones, and delivery patterns across Brazil. Explore geographic factors affecting late deliveries!</p>
     </div>
     """, unsafe_allow_html=True)
 
