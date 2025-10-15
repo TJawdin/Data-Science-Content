@@ -129,15 +129,17 @@ with tab1:
         st.markdown("### 🏆 All Models Comparison")
         
         comparison_data = []
-        for model_name, results in model_results.items():
-            comparison_data.append({
-                'Model': model_name,
-                'AUC-ROC': results.get('test_roc_auc', 0),
-                'Accuracy': results.get('test_accuracy', 0),
-                'Precision': results.get('test_precision', 0),
-                'Recall': results.get('test_recall', 0),
-                'F1-Score': results.get('test_f1', 0)
-            })
+        for model_name, res in model_results.items():
+    res = res if isinstance(res, dict) else (res.to_dict() if hasattr(res, "to_dict") else {})
+    comparison_data.append({
+        'Model': model_name,
+        'AUC-ROC': res.get('test_roc_auc', res.get('ROC AUC', 0.0)),
+        'Accuracy': res.get('test_accuracy', res.get('Accuracy', 0.0)),
+        'Precision': res.get('test_precision', res.get('Precision', 0.0)),
+        'Recall': res.get('test_recall', res.get('Recall', 0.0)),
+        'F1-Score': res.get('test_f1', res.get('F1 Score', 0.0)),
+    })
+
         
         comparison_df = pd.DataFrame(comparison_data).sort_values('AUC-ROC', ascending=False)
         
