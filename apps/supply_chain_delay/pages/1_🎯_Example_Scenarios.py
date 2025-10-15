@@ -322,8 +322,8 @@ with st.sidebar:
     st.markdown("## 📊 Scenario Summary")
     st.markdown(f"""
     **Total Scenarios:** {len(scenarios)}
-    - 🟢 Low Risk: 2
-    - 🟡 Medium Risk: 2
+    - 🟢 Low Risk: 1
+    - 🟡 Medium Risk: 1
     - 🔴 High Risk: 1
     """)
     
