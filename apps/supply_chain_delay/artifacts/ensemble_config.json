@@ -1,0 +1,17 @@
+{
+  "models": [
+    "Random Forest",
+    "XGBoost",
+    "CatBoost",
+    "LightGBM"
+  ],
+  "winner": "Ensemble (weighted)",
+  "weights": {
+    "Random Forest": 0.033,
+    "XGBoost": 0.013,
+    "CatBoost": 0.376,
+    "LightGBM": 0.578
+  },
+  "threshold": 0.672,
+  "type": "weighted"
+}
