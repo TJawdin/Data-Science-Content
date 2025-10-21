@@ -1,34 +1,47 @@
-# Core Streamlit
+# ========================
+# CORE FRAMEWORK
+# ========================
 streamlit
+python-dateutil
+joblib
+pillow
 
-# Data Science
+# ========================
+# DATA SCIENCE
+# ========================
 pandas
 numpy
 
-# Machine Learning
+# ========================
+# MACHINE LEARNING
+# ========================
 scikit-learn
 xgboost
 catboost
-joblib
+lightgbm
 
-# Model Explainability
+# ========================
+# MODEL EXPLAINABILITY
+# ========================
 shap
 
-# Visualization - Standard
+# ========================
+# VISUALIZATION
+# ========================
 matplotlib
 seaborn
-
-# Visualization - Interactive
 plotly
 altair
 
-# Geographic Visualization
+# ========================
+# GEOGRAPHIC VISUALIZATION
+# ========================
 folium
 streamlit-folium
 
-# PDF Export
+# ========================
+# UTILITIES & SUPPORT
+# ========================
 fpdf2
-pillow
-
-# Date/Time
-python-dateutil
+json5
+pathlib
