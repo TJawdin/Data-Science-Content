@@ -1,11 +1,32 @@
-[theme]
-primaryColor="#FF4B4B"
-backgroundColor="#FFFFFF"
-secondaryBackgroundColor="#F0F2F6"
-textColor="#262730"
-font="sans serif"
+# Streamlit app-wide configuration
+# Docs: https://docs.streamlit.io/library/advanced-features/configuration
 
 [server]
-maxUploadSize=200
-enableXsrfProtection=true
-enableCORS=false
+# Wide layout works best for dashboards
+headless = true
+enableCORS = false
+enableXsrfProtection = true
+port = 8501
+
+[client]
+# Reduce annoying cache warnings in the UI
+showErrorDetails = true
+toolbarMode = "auto"
+
+[theme]
+# Neutral theme that plays well with our CSS variables in theme_adaptive.py.
+# Users with system dark mode will still get dark-friendly CSS via prefers-color-scheme.
+primaryColor = "#0068C9"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F0F2F6"
+textColor = "#262730"
+font = "sans serif"
+
+# Layout
+[browser]
+gatherUsageStats = false
+serverAddress = "localhost"
+
+[runner]
+magicEnabled = true
+fastReruns = true
