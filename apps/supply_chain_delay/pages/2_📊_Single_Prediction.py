@@ -6,7 +6,6 @@
 # - Adds a "Download PDF" button using utils.pdf_generator.generate_single_report.
 
 from utils.feature_labels import get_friendly_feature_map  # friendly labels
-from __future__ import annotations  # postpone evaluation of annotations for type hints
 from datetime import date, time     # import date/time widgets for Streamlit inputs
 from typing import Any, Dict        # typing helpers for dictionaries
 
