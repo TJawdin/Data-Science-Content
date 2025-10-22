@@ -11,8 +11,8 @@
   "n_samples_test": 19283,
   "training_date": "2025-10-21",
   "artifact_files": {
-    "model": "C:\\Users\\twonj_bmotyqi\\OneDrive\\Data Science\\Data Science Class\\Capstone/artifacts/best_model_lightgbm.pkl",
-    "threshold": "C:\\Users\\twonj_bmotyqi\\OneDrive\\Data Science\\Data Science Class\\Capstone/artifacts/optimal_threshold_lightgbm.txt",
-    "final_metadata": "C:\\Users\\twonj_bmotyqi\\OneDrive\\Data Science\\Data Science Class\\Capstone/artifacts/final_metadata.json"
+    "model": "./artifacts/best_model_lightgbm.pkl",
+    "threshold": "./artifacts/optimal_threshold_lightgbm.txt",
+    "final_metadata": "./artifacts/final_metadata.json"
   }
 }
