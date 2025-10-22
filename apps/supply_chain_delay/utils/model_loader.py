@@ -1,208 +1,146 @@
 """
-Model loading, threshold loading, prediction, and feature importance.
-Dynamic risk bands are derived from the tuned threshold.
+Model Loading and Prediction Functions
 """
 
 from __future__ import annotations
-
-import json
-from pathlib import Path
-from typing import Dict, Any, Optional
-
 import joblib
 import numpy as np
 import pandas as pd
+from pathlib import Path
 import streamlit as st
 
+from utils.constants import load_runtime_thresholds, ARTIFACTS_DIR
 
-# ----------------------------
-# Paths / discovery
-# ----------------------------
-ARTIFACTS_DIR = Path(__file__).parent.parent / "artifacts"
-
-# File names we may encounter
-FINAL_META = ARTIFACTS_DIR / "final_metadata.json"
-OPT_THR_TXT_LGB = ARTIFACTS_DIR / "optimal_threshold_lightgbm.txt"
-OPT_THR_TXT = ARTIFACTS_DIR / "best_threshold.txt"           # legacy fallback
-ANY_MODEL_GLOB = "best_model_*.pkl"
+# Cache thresholds & bands once
+_THRESH = load_runtime_thresholds()
+_OPT_THR = __THRESH["THRESHOLD"]
+_LOW_MAX = __THRESH["LOW_MAX"]
+_MED_MAX = __THRESH["MED_MAX"]
 
 
-# ----------------------------
-# Caching loaders
-# ----------------------------
 @st.cache_resource
-def load_model() -> Any:
-    """Load the trained model (best_* .pkl) from artifacts/."""
-    # Prefer LightGBM file name if present
-    candidates = list(ARTIFACTS_DIR.glob(ANY_MODEL_GLOB))
-    if not candidates:
-        raise FileNotFoundError(
-            "No model file found in artifacts/. Expected pattern 'best_model_*.pkl'."
-        )
-    # If multiple, prefer lightgbm, else first
-    lightgbm_first = [p for p in candidates if "lightgbm" in p.stem.lower()]
-    model_path = lightgbm_first[0] if lightgbm_first else candidates[0]
-    model = joblib.load(model_path)
-    return model
-
-
-@st.cache_data
-def load_metadata() -> Dict[str, Any]:
-    """Load final_metadata.json if available; else return a minimal dict."""
-    if FINAL_META.exists():
-        with open(FINAL_META, "r") as f:
-            return json.load(f)
-    return {
-        "best_model": "LightGBM",
-        "best_model_auc": None,
-        "n_features": None,
-        "n_samples_train": None,
-        "training_date": None,
-        "decision_threshold": None,
-        "notes": "final_metadata.json not found; using defaults."
-    }
-
-
-@st.cache_data
-def load_threshold(default: float = 0.50) -> float:
+def load_model():
     """
-    Load the tuned decision threshold.
+    Load the trained model from artifacts folder (cached).
     Priority:
-      1) final_metadata.json -> 'decision_threshold'
-      2) optimal_threshold_lightgbm.txt
-      3) best_threshold.txt (legacy)
-      4) default (0.50)
+      1) best_model_lightgbm.pkl
+      2) best_model_*.pkl
+      3) model_*.pkl
     """
-    meta = load_metadata()
-    thr = meta.get("decision_threshold", None)
-    if isinstance(thr, (int, float)) and 0.0 <= float(thr) <= 1.0:
-        return float(thr)
+    try:
+        priority = list(ARTIFACTS_DIR.glob("best_model_lightgbm.pkl"))
+        if not priority:
+            priority = list(ARTIFACTS_DIR.glob("best_model_*.pkl"))
+        if not priority:
+            priority = list(ARTIFACTS_DIR.glob("model_*.pkl"))
 
-    for p in (OPT_THR_TXT_LGB, OPT_THR_TXT):
-        if p.exists():
-            try:
-                return float(p.read_text().strip())
-            except Exception:
-                pass
+        if not priority:
+            st.error(
+                "⚠️ No model file found in artifacts/. "
+                "Please copy your trained model to `apps/supply_chain_delay/artifacts/`."
+            )
+            return None
 
-    return float(default)
+        model_path = priority[0]
+        model = joblib.load(model_path)
+        return model
+
+    except Exception as e:
+        st.error(f"❌ Error loading model: {str(e)}")
+        return None
 
 
-# ----------------------------
-# Risk band helper (derived from threshold)
-# ----------------------------
-def risk_band(prob: float, threshold: float) -> str:
-    """
-    3-band scheme relative to tuned threshold:
-      LOW:     p < 0.50 * threshold
-      MEDIUM:  0.50 * threshold ≤ p < threshold
-      HIGH:    p ≥ threshold
-    """
-    low_cut = 0.50 * threshold
-    if prob < low_cut:
+def _risk_level_from_score(score_int: int) -> str:
+    """Map 0–100 score to LOW/MEDIUM/HIGH using global bands."""
+    if score_int < _LOW_MAX:
         return "LOW"
-    if prob < threshold:
+    if score_int < _MED_MAX:
         return "MEDIUM"
     return "HIGH"
 
 
-def risk_palette(level: str) -> str:
-    return {"LOW": "green", "MEDIUM": "orange", "HIGH": "red"}.get(level, "gray")
-
-
-def risk_band_text(threshold: float) -> str:
-    return (
-        f"Risk bands are derived from the tuned threshold (τ = {threshold:.3f}):  "
-        f"LOW: p < {0.5*threshold:.3f} • "
-        f"MEDIUM: {0.5*threshold:.3f} ≤ p < {threshold:.3f} • "
-        f"HIGH: p ≥ {threshold:.3f}"
-    )
-
-
-# ----------------------------
-# Prediction APIs
-# ----------------------------
-def _proba(model: Any, X: pd.DataFrame) -> np.ndarray:
-    if hasattr(model, "predict_proba"):
-        proba = model.predict_proba(X)
-        return proba[:, 1] if proba.ndim == 2 else proba
-    if hasattr(model, "decision_function"):
-        z = model.decision_function(X)
-        return 1.0 / (1.0 + np.exp(-z))
-    # very rare case
-    preds = model.predict(X)
-    # if predict already returns prob, ensure in [0,1]
-    preds = np.asarray(preds, dtype=float)
-    if preds.min() >= 0 and preds.max() <= 1:
-        return preds
-    # map labels {0,1} to [0,1]
-    return (preds > 0).astype(float)
-
-
-def predict_single(model: Any, features_df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+def predict_single(model, features_df: pd.DataFrame) -> dict | None:
     """
-    Predict for a single order.
-    Returns: dict with prediction, label, probability, risk_score, risk_level, risk_color.
+    Predict a single order. Returns dict with:
+      - prediction (0/1), prediction_label
+      - probability (float 0..1), risk_score (0..100 int)
+      - risk_level ('LOW'|'MEDIUM'|'HIGH')
     """
     try:
-        threshold = load_threshold()
-        p = float(_proba(model, features_df)[0])
-        pred = int(p >= threshold)
-        level = risk_band(p, threshold)
-        color = risk_palette(level)
+        if hasattr(model, "predict_proba"):
+            prob_late = float(model.predict_proba(features_df)[0, 1])
+        else:
+            # Fallback (rare): use raw prediction as "probability"
+            prob_late = float(model.predict(features_df)[0])
+
+        prediction = int(prob_late >= _OPT_THR)
+        risk_score = int(round(prob_late * 100))
+        risk_level = _risk_level_from_score(risk_score)
+
         return {
-            "prediction": pred,
-            "prediction_label": "Late" if pred == 1 else "On-Time",
-            "probability": p,
-            "risk_score": int(round(p * 100)),
-            "risk_level": level,
-            "risk_color": color,
-            "threshold": threshold,
+            "prediction": prediction,
+            "prediction_label": "Late" if prediction == 1 else "On-Time",
+            "probability": prob_late,
+            "risk_score": risk_score,
+            "risk_level": risk_level,
         }
+
     except Exception as e:
-        st.error(f"❌ Prediction error: {e}")
+        st.error(f"❌ Prediction error: {str(e)}")
         return None
 
 
-def predict_batch(model: Any, features_df: pd.DataFrame) -> Optional[pd.DataFrame]:
+def predict_batch(model, features_df: pd.DataFrame) -> pd.DataFrame | None:
     """
-    Batch predictions. Returns a DataFrame with Prediction, Late_Probability, Risk_Score, risk_level.
+    Batch predictions. Returns DataFrame with:
+      - Prediction ('On-Time'|'Late')
+      - Late_Probability (0..1)
+      - Risk_Score (0..100)
+      - risk_level ('LOW'|'MEDIUM'|'HIGH')
     """
     try:
-        threshold = load_threshold()
-        proba = _proba(model, features_df)
-        preds = (proba >= threshold).astype(int)
-        levels = [risk_band(p, threshold) for p in proba]
+        if hasattr(model, "predict_proba"):
+            prob_late = model.predict_proba(features_df)[:, 1]
+        else:
+            prob_late = model.predict(features_df).astype(float)
 
-        out = pd.DataFrame({
-            "Prediction": np.where(preds == 1, "Late", "On-Time"),
-            "Late_Probability": proba,
-            "Risk_Score": (proba * 100).round(0).astype(int),
-            "risk_level": levels,
+        predictions = (prob_late >= _OPT_THR).astype(int)
+        risk_scores = np.rint(prob_late * 100).astype(int)
+        risk_levels = np.where(
+            risk_scores < _LOW_MAX, "LOW",
+            np.where(risk_scores < _MED_MAX, "MEDIUM", "HIGH")
+        )
+
+        return pd.DataFrame({
+            "Prediction": np.where(predictions == 1, "Late", "On-Time"),
+            "Late_Probability": prob_late,
+            "Risk_Score": risk_scores,
+            "risk_level": risk_levels,  # lowercase col name expected by visuals
         })
-        return out
+
     except Exception as e:
-        st.error(f"❌ Batch prediction error: {e}")
+        st.error(f"❌ Batch prediction error: {str(e)}")
         return None
 
 
-# ----------------------------
-# Feature importance (for tree / linear)
-# ----------------------------
-def get_feature_importance(model: Any, feature_names: list[str]) -> Optional[pd.DataFrame]:
+def get_feature_importance(model, feature_names: list[str]) -> pd.DataFrame | None:
+    """Feature importance (works for tree & linear models)."""
     try:
-        actual = model.named_steps.get("clf") if hasattr(model, "named_steps") else model
+        m = model.named_steps.get("clf", model) if hasattr(model, "named_steps") else model
 
-        if hasattr(actual, "feature_importances_"):
-            imp = actual.feature_importances_
-        elif hasattr(actual, "coef_"):
-            imp = np.abs(actual.coef_[0])
+        if hasattr(m, "feature_importances_"):
+            imp = m.feature_importances_
+        elif hasattr(m, "coef_"):
+            imp = np.abs(m.coef_[0])
         else:
             st.warning("⚠️ Model does not expose feature importance.")
             return None
 
-        df = pd.DataFrame({"Feature": feature_names, "Importance": imp})
-        return df.sort_values("Importance", ascending=False).reset_index(drop=True)
+        return (
+            pd.DataFrame({"Feature": feature_names, "Importance": imp})
+            .sort_values("Importance", ascending=False)
+            .reset_index(drop=True)
+        )
     except Exception as e:
-        st.error(f"❌ Feature importance error: {e}")
+        st.error(f"❌ Error extracting feature importance: {str(e)}")
         return None
