@@ -1,47 +1,48 @@
 # ========================
 # CORE FRAMEWORK
 # ========================
-streamlit
-python-dateutil
-joblib
-pillow
+streamlit==1.38.0           # app framework
+python-dateutil==2.9.0.post0# robust datetime parsing
+joblib==1.4.2               # model serialization
+pillow==10.3.0              # image handling for static assets
 
 # ========================
 # DATA SCIENCE
 # ========================
-pandas
-numpy
+pandas==2.2.2               # DataFrames (works well with NumPy 1.26)
+numpy==1.26.4               # pin <2.0 for broad ML/SHAP compatibility
 
 # ========================
 # MACHINE LEARNING
 # ========================
-scikit-learn
-xgboost
-catboost
-lightgbm
+scikit-learn==1.4.2         # model utils + metrics
+xgboost==2.0.3              # optional (kept if you compare models)
+catboost==1.2.5             # optional (kept if you compare models)
+lightgbm==4.3.0             # your best model (LGBM)
 
 # ========================
 # MODEL EXPLAINABILITY
 # ========================
-shap
+shap==0.44.1                # stable with NumPy 1.26; Tree/Kernel explainers
+numba==0.58.1               # SHAP speedups (compatible with NumPy 1.26)
 
 # ========================
 # VISUALIZATION
 # ========================
-matplotlib
-seaborn
-plotly
-altair
+matplotlib==3.8.4           # static charts
+seaborn==0.13.2             # statistical plots
+plotly==5.22.0              # interactive charts (used with theme helper)
+altair==5.3.0               # optional analytics viz
 
 # ========================
 # GEOGRAPHIC VISUALIZATION
 # ========================
-folium
-streamlit-folium
+folium==0.16.0              # leaflet maps
+streamlit-folium==0.22.0    # Streamlit wrapper
 
 # ========================
 # UTILITIES & SUPPORT
 # ========================
-fpdf2
-json5
-pathlib
+fpdf2==2.7.9                # PDF export for reports
+json5==0.9.25               # lenient JSON parsing if needed
+# pathlib                  # stdlib; remove (no pip package needed)
