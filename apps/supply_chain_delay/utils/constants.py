@@ -1,56 +1,105 @@
 """
-Global constants for model cut-points & thresholds.
-This is the single source of truth for the Streamlit app.
+Global constants & metadata loader
+Reads artifacts/final_metadata.json and exposes:
+- OPTIMAL_THRESHOLD (float 0..1)
+- RISK_BANDS (dict with low/med cutpoints in 0..100 scale)
+- MODEL_METADATA (full dict)
+- FRIENDLY_FEATURE_NAMES (business-facing labels)
 """
 
 from __future__ import annotations
-from pathlib import Path
 import json
+from pathlib import Path
 
-# --- DEFAULTS (must match your current notebook Section 6.3) ---
-# LightGBM winner @ F1-optimal threshold
-THRESHOLD = 0.1966            # 19.66%
-LOW_MAX = 12                  # 0–11%  -> LOW
-MED_MAX = 30                  # 12–29% -> MEDIUM ; 30%+ -> HIGH
+# ---------------------------------------------------------------------
+# Locate artifacts and load final metadata (with safe defaults)
+# ---------------------------------------------------------------------
+ARTIFACTS_DIR = Path(__file__).resolve().parents[1] / "artifacts"
+FINAL_META_PATH = ARTIFACTS_DIR / "final_metadata.json"
 
-# Locations
-ARTIFACTS_DIR = Path(__file__).parent.parent / "artifacts"
-FINAL_META = ARTIFACTS_DIR / "final_metadata.json"
+_DEFAULT_META = {
+    "best_model": "LightGBM",
+    "best_model_auc": 0.78,
+    "best_model_precision": 0.30,
+    "best_model_recall": 0.44,
+    "best_model_f1": 0.36,
+    # if the file is missing, default to a conservative 0.50 threshold
+    "optimal_threshold": 0.50,
+    # risk bands in percent; will be normalized below
+    "risk_bands": {"low_max": 30, "med_max": 67},
+    "n_features": 29,
+    "n_samples_train": 0,
+    "n_samples_test": 0,
+    "training_date": "N/A",
+}
 
+try:
+    MODEL_METADATA = json.loads(FINAL_META_PATH.read_text(encoding="utf-8"))
+except Exception:
+    MODEL_METADATA = dict(_DEFAULT_META)
 
-def _coerce_float(v, fallback):
-    try:
-        return float(v)
-    except Exception:
-        return fallback
+# ---------------------------------------------------------------------
+# Threshold & risk bands
+# ---------------------------------------------------------------------
+OPTIMAL_THRESHOLD: float = float(MODEL_METADATA.get("optimal_threshold", 0.50))
 
+# Bands are expressed in percent (0..100). Ensure med_max ~= threshold% so
+# the High band starts at the operating threshold.
+rb = MODEL_METADATA.get("risk_bands", {}) or {}
+_low_max = int(rb.get("low_max", 30))
+_med_max = int(rb.get("med_max", round(OPTIMAL_THRESHOLD * 100)))
 
-def load_runtime_thresholds() -> dict:
-    """
-    Load thresholds from final_metadata.json if present; otherwise use defaults.
-    The JSON should contain: "decision_threshold": 0.1966
-    """
-    t = THRESHOLD
-    low = LOW_MAX
-    med = MED_MAX
+# Make sure ordering is valid: 0 <= low < med <= 100
+_low_max = max(0, min(_low_max, 100))
+_med_max = max(_low_max + 1, min(_med_max, 100))
 
-    try:
-        if FINAL_META.exists():
-            meta = json.loads(FINAL_META.read_text(encoding="utf-8"))
-            # Prefer explicit key; fall back to any legacy fields if needed
-            t = _coerce_float(meta.get("decision_threshold", t), t)
+RISK_BANDS = {
+    "low_max": _low_max,            # e.g., 30  → LOW: 0..30
+    "med_max": _med_max,            # e.g., 67  → MED: 31..67, HIGH: >= 67
+}
 
-            # Optional: allow overriding bands (else keep defaults)
-            bands = meta.get("risk_bands", {}) or {}
-            low = int(bands.get("low_max", low))
-            med = int(bands.get("med_max", med))
-    except Exception:
-        # Silently fall back to defaults
-        pass
+# ---------------------------------------------------------------------
+# Business-friendly feature labels (used across app & plots)
+# ---------------------------------------------------------------------
+FRIENDLY_FEATURE_NAMES = {
+    # Order Complexity
+    "num_items": "Number of Items",
+    "num_sellers": "Number of Sellers",
+    "num_products": "Number of Products",
+    "is_multi_seller": "Multi-Seller Order",
+    "is_multi_item": "Multi-Item Order",
 
-    return {
-        "THRESHOLD": t,
-        "THRESHOLD_PCT": t * 100.0,
-        "LOW_MAX": int(low),
-        "MED_MAX": int(med),
-    }
+    # Financial
+    "total_order_value": "Total Order Value ($)",
+    "avg_item_price": "Average Item Price ($)",
+    "max_item_price": "Highest Item Price ($)",
+    "total_shipping_cost": "Total Shipping Cost ($)",
+    "avg_shipping_cost": "Avg Shipping Cost ($)",
+    "weight_to_price_ratio": "Weight / Price Ratio",
+    "shipping_cost_per_km": "Shipping Cost per KM ($)",
+
+    # Physical
+    "total_weight_g": "Total Weight (g)",
+    "avg_weight_g": "Average Weight (g)",
+    "max_weight_g": "Heaviest Item (g)",
+    "avg_length_cm": "Avg Length (cm)",
+    "avg_height_cm": "Avg Height (cm)",
+    "avg_width_cm": "Avg Width (cm)",
+    "avg_product_volume_cm3": "Avg Product Volume (cm³)",
+
+    # Geographic
+    "avg_shipping_distance_km": "Shipping Distance (km)",
+    "max_shipping_distance_km": "Max Shipping Distance (km)",
+    "is_cross_state": "Cross-State Shipping",
+
+    # Temporal
+    "order_weekday": "Order Day of Week",
+    "order_month": "Order Month",
+    "order_hour": "Order Hour",
+    "is_weekend_order": "Weekend Order",
+    "is_holiday_season": "Holiday Season Order",
+    "is_rush_order": "Rush Order (<7 days)",
+
+    # Time Estimation
+    "estimated_days": "Estimated Delivery Days",
+}
