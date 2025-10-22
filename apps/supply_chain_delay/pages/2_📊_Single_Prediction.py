@@ -159,6 +159,7 @@ if submitted:                                                     # only run whe
     engineered = calculate_features(pd.DataFrame([raw]))            # transform raw → engineered
 
     # PDF generation: assemble and offer download
+    friendly_map = get_friendly_feature_map()  # single source of truth
     pdf_bytes = generate_single_report(                             # build the PDF in memory
         order_raw=raw,                                              # raw inputs dictionary
         prediction=result,                                          # model result dictionary
