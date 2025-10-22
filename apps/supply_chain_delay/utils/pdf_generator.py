@@ -1,335 +1,367 @@
 """
-PDF Report Generator
-Creates professional PDF reports for order risk predictions
+PDF Report Generator (fpdf2)
+Creates professional PDF reports for single and batch predictions.
+
+This module is fully compatible with our new app architecture:
+- Reads threshold/bands/metrics from utils.model_loader.load_metadata()
+- Returns in-memory bytes for Streamlit download_button
+- Supports optional SHAP-like per-feature contributions for Single reports
 """
 
-from __future__ import annotations
-from fpdf import FPDF
-import pandas as pd
-from datetime import datetime
-
-# NEW: import current model metadata, thresholds, and friendly names
-from utils.constants import (
-    FINAL_METADATA,          # dict loaded from artifacts/final_metadata.json
-    OPTIMAL_THRESHOLD,       # float, e.g. 0.669271
-    RISK_BANDS,              # {"low_max": 12, "med_max": 30}
-    FRIENDLY_FEATURE_NAMES,  # technical -> business-friendly mapping
-)
-
-# --------------------------------------------------------------------------- #
-# Utilities
-# --------------------------------------------------------------------------- #
-
-def _risk_color(level: str):
-    if level.upper() == "LOW":
-        return (46, 204, 113)   # green
-    if level.upper() == "MEDIUM":
-        return (243, 156, 18)   # orange
-    return (231, 76, 60)        # red
+from __future__ import annotations  # future annotations for cleaner type hints
+from typing import Any, Dict, Optional, List  # typing for clarity
+from datetime import datetime                 # timestamping report generation
+import pandas as pd                            # tabular manipulations
+from fpdf import FPDF                          # lightweight PDF generation
+from utils.model_loader import load_metadata   # read final_metadata.json on demand
 
 
-def _band_for_score(score_0_100: int):
-    low_max = int(RISK_BANDS["low_max"])
-    med_max = int(RISK_BANDS["med_max"])
-    if score_0_100 <= low_max:
-        return "LOW"
-    if score_0_100 <= med_max:
-        return "MEDIUM"
-    return "HIGH"
+# =============================================================================
+# Internal helpers
+# =============================================================================
+
+def _bands_from_meta(meta: Dict[str, Any]) -> Dict[str, int]:
+    """Extract risk band cut points from metadata with safe defaults."""
+    rb = meta.get("risk_bands", {})                                  # read bands
+    return {"low_max": int(rb.get("low_max", 30)),                   # default 30
+            "med_max": int(rb.get("med_max", 67))}                   # default 67
 
 
-def _friendly(name: str) -> str:
-    return FRIENDLY_FEATURE_NAMES.get(name, name)
+def _band_label_from_prob(prob_0_1: float, bands: Dict[str, int]) -> str:
+    """Map probability (0..1) to 'Low'|'Medium'|'High' using metadata percent cutpoints."""
+    pct = float(prob_0_1) * 100.0                                    # convert to percent
+    if pct <= bands["low_max"]:                                       # compare to low
+        return "Low"                                                  # low band
+    if pct <= bands["med_max"]:                                       # compare to medium
+        return "Medium"                                               # medium band
+    return "High"                                                     # otherwise high
 
 
-# --------------------------------------------------------------------------- #
-# PDF Class
-# --------------------------------------------------------------------------- #
+def _band_rgb(level: str) -> tuple[int, int, int]:
+    """Consistent band colors (matches theme_adaptive badges)."""
+    lvl = str(level).strip().lower()                                  # normalize
+    if lvl == "low":
+        return (46, 204, 113)                                         # green
+    if lvl == "medium":
+        return (243, 156, 18)                                         # orange
+    return (231, 76, 60)                                              # red
+
+
+def _friendly(name: str, mapping: Optional[Dict[str, str]]) -> str:
+    """Return business-friendly name if provided, else echo the technical name."""
+    if mapping and name in mapping:                                   # if mapping given & key exists
+        return str(mapping[name])                                     # mapped label
+    return str(name)                                                  # fallback: raw feature name
+
+
+# =============================================================================
+# PDF base class (fpdf2)
+# =============================================================================
 
 class RiskReportPDF(FPDF):
-    """Custom PDF class for risk assessment reports"""
+    """Minimal, clean PDF skeleton with header/footer and helper blocks."""
 
-    def __init__(self):
-        super().__init__()
-        self.set_auto_page_break(auto=True, margin=15)
+    def __init__(self, title: str = "Supply Chain Delay Risk Assessment"):
+        super().__init__(orientation="P", unit="mm", format="A4")     # portrait A4
+        self.title_text = title                                       # store title
+        self.set_auto_page_break(auto=True, margin=15)                # auto page breaks with margin
 
-    def header(self):
-        self.set_font('Arial', 'B', 16)
-        self.set_text_color(44, 62, 80)
-        self.cell(0, 10, 'Supply Chain Delay Risk Assessment Report', 0, 1, 'C')
-        self.ln(5)
+    # ---- Header / Footer -----------------------------------------------------
 
-    def footer(self):
-        self.set_y(-15)
-        self.set_font('Arial', 'I', 8)
-        self.set_text_color(128, 128, 128)
-        self.cell(0, 10, f'Page {self.page_no()}', 0, 0, 'C')
+    def header(self) -> None:
+        """Top banner with title; runs on each page."""
+        self.set_font("Arial", "B", 14)                               # bold title font
+        self.set_text_color(44, 62, 80)                               # dark blue-gray
+        self.cell(0, 10, self.title_text, border=0, ln=1, align="C")  # centered title
+        self.ln(2)                                                    # small spacing
 
-    def chapter_title(self, title):
-        self.set_font('Arial', 'B', 14)
-        self.set_text_color(52, 73, 94)
-        self.cell(0, 10, title, 0, 1, 'L')
-        self.ln(2)
+    def footer(self) -> None:
+        """Bottom page number; runs on each page."""
+        self.set_y(-15)                                               # 15mm from bottom
+        self.set_font("Arial", "I", 8)                                # small italic font
+        self.set_text_color(120, 120, 120)                            # gray
+        self.cell(0, 8, f"Page {self.page_no()}", 0, 0, "C")          # centered page number
 
-    def chapter_body(self, body):
-        self.set_font('Arial', '', 11)
-        self.set_text_color(0, 0, 0)
-        self.multi_cell(0, 6, body)
-        self.ln()
+    # ---- Section helpers -----------------------------------------------------
 
-    def add_colored_box(self, text, color_rgb):
-        self.set_fill_color(*color_rgb)
-        self.set_font('Arial', 'B', 12)
-        self.set_text_color(255, 255, 255)
-        self.cell(0, 10, text, 0, 1, 'C', fill=True)
-        self.ln(2)
+    def section_title(self, text: str) -> None:
+        """Consistent section title styling."""
+        self.set_font("Arial", "B", 12)                               # bold
+        self.set_text_color(52, 73, 94)                               # deep gray-blue
+        self.cell(0, 8, text, border=0, ln=1, align="L")              # left-aligned
+        self.ln(1)                                                    # small spacing
+
+    def paragraph(self, text: str) -> None:
+        """Body text block with automatic wrapping."""
+        self.set_font("Arial", "", 10)                                # regular font
+        self.set_text_color(0, 0, 0)                                  # black
+        self.multi_cell(0, 5, text)                                   # wrap at page width
+        self.ln(1)                                                    # spacing
+
+    def band_badge(self, label: str, text: str) -> None:
+        """Draw a full-width colored badge for the risk level."""
+        r, g, b = _band_rgb(label)                                    # pick color by band
+        self.set_fill_color(r, g, b)                                  # set fill color
+        self.set_text_color(255, 255, 255)                            # white text
+        self.set_font("Arial", "B", 12)                               # bold
+        self.cell(0, 10, text, border=0, ln=1, align="C", fill=True)  # full-width cell
+        self.set_text_color(0, 0, 0)                                  # restore black
+        self.ln(2)                                                    # spacing
+
+    def key_value(self, key: str, value: str) -> None:
+        """Single-line key/value helper (left/right)."""
+        self.set_font("Arial", "", 10)                                # regular font
+        self.set_text_color(0, 0, 0)                                  # black
+        self.cell(60, 6, f"{key}:", border=0, align="L")              # left key
+        self.cell(0, 6, value, border=0, ln=1, align="L")             # value
+        # no extra spacing to allow compact lists
+
+    def small_table(self, rows: List[List[str]], col_widths: Optional[List[int]] = None) -> None:
+        """
+        Draw a simple table. Very lightweight; for short lists (e.g., top features).
+        - rows: list of [col1, col2, ...]
+        - col_widths: optional list of widths (mm) matching number of columns
+        """
+        if not rows:                                                  # nothing to draw
+            return
+        ncols = len(rows[0])                                          # number of columns
+        usable_w = self.w - self.l_margin - self.r_margin             # page width minus margins
+        if col_widths is None:                                        # if no widths given
+            col_widths = [usable_w / ncols] * ncols                   # equal widths
+        # Header style (first row bold)
+        self.set_font("Arial", "B", 10)                               # bold header
+        for i, cell in enumerate(rows[0]):
+            self.cell(col_widths[i], 7, str(cell), border=1, align="L")  # header cells
+        self.ln(7)                                                    # line break
+        self.set_font("Arial", "", 9)                                 # body font
+        for r in rows[1:]:                                            # remaining rows
+            for i, cell in enumerate(r):
+                txt = str(cell)
+                # simple truncation if too long for the column width
+                if len(txt) > 64:
+                    txt = txt[:61] + "..."
+                self.cell(col_widths[i], 6, txt, border=1, align="L") # body cells
+            self.ln(6)                                                # line break
+        self.ln(2)                                                    # spacing after table
 
 
-# --------------------------------------------------------------------------- #
-# Main API
-# --------------------------------------------------------------------------- #
+# =============================================================================
+# Public API: Single report
+# =============================================================================
 
-def generate_risk_report(
-    order_data: dict,
-    prediction_result: dict,
-    features_df: pd.DataFrame,
-    shap_contributions: dict | None = None,
+def generate_single_report(
+    *,
+    order_raw: Dict[str, Any],                         # the raw inputs a user entered
+    prediction: Dict[str, Any],                        # output from predict_single(...)
+    engineered_features: pd.DataFrame,                 # 1-row engineered feature vector
+    shap_contributions: Optional[Dict[str, float]] = None,  # optional SHAP-like dict
+    friendly_feature_names: Optional[Dict[str, str]] = None # optional mapping tech->friendly
 ) -> bytes:
     """
-    Generate a PDF risk assessment report
-
-    Parameters
-    ----------
-    order_data : dict
-        Original order information (what the user entered)
-    prediction_result : dict
-        Output from predict_single(...) in model_loader (probability, risk_score, risk_level, etc.)
-    features_df : pd.DataFrame
-        Final model-ready features (1 row). Used to display top feature values if SHAP not provided.
-    shap_contributions : dict, optional
-        Per-feature SHAP values for the same row, in the form {technical_feature: shap_value}.
-        When provided, we present the Top Contributing Factors by absolute SHAP.
+    Create a single-order PDF report.
 
     Returns
     -------
-    bytes : PDF file bytes
+    bytes
+        PDF file bytes suitable for Streamlit's st.download_button.
     """
+    meta = load_metadata()                                              # load latest metadata
+    bands = _bands_from_meta(meta)                                      # read band cutpoints
+    thr = float(meta.get("optimal_threshold", 0.5))                     # operating threshold
+    auc = float(meta.get("best_model_auc", 0.0))                        # key metrics
+    prec = float(meta.get("best_model_precision", 0.0))
+    rec = float(meta.get("best_model_recall", 0.0))
+    f1 = float(meta.get("best_model_f1", 0.0))
 
-    pdf = RiskReportPDF()
-    pdf.add_page()
+    # Extract prob and band
+    prob = float(prediction.get("score", prediction.get("probability", 0.0)))  # tolerate alt key
+    band = _band_label_from_prob(prob, bands)                                   # compute band label
 
-    # ------------------------------------------------------------------ #
-    # EXECUTIVE SUMMARY
-    # ------------------------------------------------------------------ #
-    pdf.chapter_title('Executive Summary')
+    # Instantiate PDF and add first page
+    pdf = RiskReportPDF(title="Supply Chain Delay Risk Report")                 # create PDF
+    pdf.add_page()                                                              # first page
 
-    risk_level = prediction_result['risk_level']
-    risk_score = int(prediction_result['risk_score'])  # 0..100
-    late_prob = float(prediction_result['probability'])  # 0..1
+    # --- Executive summary ----------------------------------------------------
+    pdf.section_title("Executive Summary")                                      # section heading
+    pdf.band_badge(band, f"RISK LEVEL: {band.upper()}  ({prob*100:.1f}%)")     # colored badge
+    pdf.paragraph(                                                              # summary bullets
+        "This prediction estimates the probability that this shipment will be delivered late. "
+        "Use it to prioritize interventions and customer communications."
+    )
+    pdf.key_value("Predicted probability", f"{prob:.4f}  ({prob*100:.2f}%)")   # prob
+    pdf.key_value("Operating threshold", f"{thr:.4f}  ({thr*100:.2f}%)")       # threshold
+    pdf.key_value("Meets threshold", "Yes" if prob >= thr else "No")           # meets?
+    pdf.key_value("Model type", str(meta.get("best_model", "LightGBM")))       # model name
+    pdf.key_value("AUC-ROC", f"{auc:.4f}")                                      # metrics
+    pdf.key_value("Precision / Recall / F1", f"{prec:.3f} / {rec:.3f} / {f1:.3f}")
+    pdf.key_value("Report generated", datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"))
 
-    # Ensure level aligns with current band rules (in case upstream changed)
-    risk_level = _band_for_score(risk_score)
+    pdf.ln(2)                                                                   # spacing
 
-    pdf.add_colored_box(f"RISK LEVEL: {risk_level} ({risk_score}/100)", _risk_color(risk_level))
+    # --- Order details (echo raw inputs) --------------------------------------
+    pdf.section_title("Order Details (Raw Inputs)")                             # section heading
+    # Render a compact list of the main raw fields the user supplied
+    for k in ["order_purchase_timestamp", "estimated_delivery_date",
+              "sum_price", "sum_freight", "n_items", "n_sellers",
+              "payment_type", "max_installments", "mode_category",
+              "customer_city", "customer_state"]:
+        if k in order_raw:
+            pdf.key_value(k, str(order_raw.get(k)))                             # print key/value
 
-    thr_pct = int(round(OPTIMAL_THRESHOLD * 100))
-    auc = FINAL_METADATA.get("best_model_auc", 0.0)
-    prec = FINAL_METADATA.get("best_model_precision", 0.0)
-    rec = FINAL_METADATA.get("best_model_recall", 0.0)
-    f1 = FINAL_METADATA.get("best_model_f1", 0.0)
+    # --- Top contributing factors ---------------------------------------------
+    pdf.ln(3)                                                                   # spacing
+    pdf.section_title("Top Contributing Factors")                               # section heading
+    rows: List[List[str]] = []                                                  # table rows container
 
-    pdf.chapter_body(
-        f"Prediction: {prediction_result['prediction_label']}\n"
-        f"Late Delivery Probability: {late_prob:.1%}\n"
-        f"Operating Threshold: {thr_pct}% (auto-optimized)\n"
-        f"Model AUC-ROC: {auc:.4f} | Precision: {prec:.3f} | Recall: {rec:.3f} | F1: {f1:.3f}\n"
-        f"Report Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}"
+    if shap_contributions:                                                      # preferred: SHAP-like dict
+        # Sort by absolute contribution and show top 10
+        sorted_pairs = sorted(shap_contributions.items(), key=lambda kv: abs(float(kv[1])), reverse=True)[:10]
+        rows.append(["Feature (Business Name)", "Impact (±)"])                  # header
+        for name, val in sorted_pairs:
+            rows.append([_friendly(name, friendly_feature_names), f"{float(val):+.3f}"])  # each row
+    else:
+        # Fallback: show the largest-magnitude engineered values (quick proxy)
+        if isinstance(engineered_features, pd.DataFrame) and not engineered_features.empty:
+            ser = engineered_features.iloc[0]                                    # first/only row
+            # Only consider numerics for magnitude sorting; strings become 1/0 by non-emptiness
+            proxy = []
+            for name, val in ser.items():
+                try:
+                    mag = abs(float(val))
+                except Exception:
+                    mag = 1.0 if str(val).strip() else 0.0
+                proxy.append((name, val, mag))
+            proxy = sorted(proxy, key=lambda x: x[2], reverse=True)[:10]         # top 10 by magnitude
+            rows.append(["Feature (Business Name)", "Value"])                    # header
+            for name, val, _ in proxy:
+                show_val = f"{float(val):.4f}" if isinstance(val, (int, float)) else str(val)
+                rows.append([_friendly(name, friendly_feature_names), show_val])
+
+    if rows:
+        pdf.small_table(rows)                                                    # draw the table
+    else:
+        pdf.paragraph("No feature details available for this prediction.")       # fallback note
+
+    # --- Model information -----------------------------------------------------
+    pdf.section_title("Model Information")                                       # heading
+    info_lines = [
+        f"Model: {meta.get('best_model', 'LightGBM')}",
+        f"Engineered features: {int(meta.get('n_features', 0))}",
+        f"Training samples: {int(meta.get('n_samples_train', 0)):,}",
+        f"Test samples: {int(meta.get('n_samples_test', 0)):,}",
+        f"Training date: {meta.get('training_date', 'N/A')}",
+    ]
+    pdf.paragraph("\n".join(info_lines))                                         # print lines
+
+    # --- Disclaimer ------------------------------------------------------------
+    pdf.ln(2)                                                                    # spacing
+    pdf.set_font("Arial", "I", 8)                                               # small italic
+    pdf.set_text_color(120, 120, 120)                                           # gray text
+    pdf.multi_cell(0, 4,
+        "DISCLAIMER: This risk assessment is generated by a machine learning model and is intended "
+        "as decision support. Actual outcomes may vary based on factors outside the model. Apply "
+        "business judgment for operational decisions."
     )
 
-    # ------------------------------------------------------------------ #
-    # ORDER DETAILS
-    # ------------------------------------------------------------------ #
-    pdf.chapter_title('Order Details')
+    # Output bytes (fpdf2: dest='S' returns bytes)
+    return pdf.output(dest="S")                                                 # return bytes
+    # NOTE: Streamlit usage:
+    # st.download_button("Download PDF", data=generate_single_report(...), file_name="risk_report.pdf", mime="application/pdf")
 
-    order_summary = f"""
-Number of Items: {order_data.get('num_items', 'N/A')}
-Number of Sellers: {order_data.get('num_sellers', 'N/A')}
-Total Order Value: ${order_data.get('total_order_value', 0):.2f}
-Total Shipping Cost: ${order_data.get('total_shipping_cost', 0):.2f}
-Total Weight: {order_data.get('total_weight_g', 0)} g
 
-Shipping Distance: {order_data.get('avg_shipping_distance_km', 0)} km
-Cross-State Shipping: {'Yes' if order_data.get('is_cross_state', 0) == 1 else 'No'}
-Estimated Delivery: {order_data.get('estimated_days', 0)} days
-Weekend Order: {'Yes' if order_data.get('is_weekend_order', 0) == 1 else 'No'}
-Holiday Season: {'Yes' if order_data.get('is_holiday_season', 0) == 1 else 'No'}
+# =============================================================================
+# Public API: Batch summary report
+# =============================================================================
+
+def generate_batch_summary_report(
+    *,
+    scored_df: pd.DataFrame,                         # output of predict_batch(...): includes score, meets_threshold, risk_band
+    sample_preview_rows: int = 25                    # number of rows to include in preview table
+) -> bytes:
     """
-    pdf.chapter_body(order_summary.strip())
+    Create a concise batch PDF summarizing a scored CSV.
 
-    # ------------------------------------------------------------------ #
-    # RISK ASSESSMENT (bands from metadata)
-    # ------------------------------------------------------------------ #
-    pdf.chapter_title('Risk Assessment Breakdown')
+    The report includes:
+    - Overall counts and average score
+    - Band distribution
+    - Threshold summary
+    - Optional preview of the first N rows (safe, small)
 
-    low_max = int(RISK_BANDS["low_max"])
-    med_max = int(RISK_BANDS["med_max"])
-
-    pdf.set_font('Arial', 'B', 11)
-    pdf.cell(0, 8, 'Risk Score Interpretation:', 0, 1)
-    pdf.set_font('Arial', '', 10)
-
-    if risk_score <= low_max:
-        interpretation = f"""
-LOW RISK (0–{low_max}%): This order has a low probability of late delivery.
-Standard processing procedures are recommended. No special intervention required.
-        """
-    elif risk_score <= med_max:
-        interpretation = f"""
-MEDIUM RISK ({low_max+1}–{med_max}%): This order has moderate risk. Monitor
-closely and ensure optimal carrier selection. Consider proactive customer communication.
-        """
-    else:
-        interpretation = f"""
-HIGH RISK ({med_max+1}–100%): This order has a high probability of late delivery.
-Immediate action recommended: upgrade shipping, prioritize processing, and proactively
-contact the customer.
-        """
-    pdf.multi_cell(0, 5, interpretation.strip())
-    pdf.ln(3)
-
-    # ------------------------------------------------------------------ #
-    # RECOMMENDATIONS (based on band)
-    # ------------------------------------------------------------------ #
-    pdf.chapter_title('Recommended Actions')
-
-    if risk_score > med_max:
-        recommendations = """
-IMMEDIATE ACTIONS REQUIRED:
-- Upgrade to expedited shipping immediately
-- Flag order for priority warehouse processing
-- Proactively contact customer with realistic timeline
-- Consider splitting order across warehouses if possible
-- Budget for potential refund or compensation
-- Implement daily monitoring until delivery confirmed
-
-ESCALATION:
-- Notify operations manager
-- Alert customer service team
-- Document all actions taken
-        """
-    elif risk_score > low_max:
-        recommendations = """
-MONITORING REQUIRED:
-- Add to daily monitoring watchlist
-- Send automated tracking updates to customer
-- Ensure optimal carrier selection for route
-- Review shipping route for potential bottlenecks
-- Prepare customer service for potential inquiries
-
-PREVENTIVE MEASURES:
-- Consider upgrading shipping if within budget
-- Verify warehouse stock availability
-- Check carrier performance history for this route
-        """
-    else:
-        recommendations = """
-STANDARD PROCESSING:
-- Proceed with normal shipping workflow
-- Apply standard customer communication
-- No special intervention required
-- Include in regular batch monitoring
-
-QUALITY ASSURANCE:
-- Verify all items in stock
-- Confirm carrier pickup schedule
-- Standard quality checks apply
-        """
-    pdf.chapter_body(recommendations.strip())
-
-    # ------------------------------------------------------------------ #
-    # TOP CONTRIBUTING FACTORS (prefer SHAP if provided)
-    # ------------------------------------------------------------------ #
-    pdf.add_page()
-    pdf.chapter_title('Top Contributing Factors')
-
-    # Build rows: either SHAP contributions (preferred) or feature values
-    rows = []
-    if shap_contributions:
-        # Sort by absolute SHAP value and show contribution
-        items = [( _friendly(k), float(v) ) for k, v in shap_contributions.items()]
-        rows = sorted(items, key=lambda x: abs(x[1]), reverse=True)[:10]
-
-        pdf.set_font('Arial', 'B', 10)
-        pdf.cell(120, 7, 'Feature (Business Name)', 1, 0, 'L')
-        pdf.cell(20, 7, 'Impact', 1, 1, 'C')
-        pdf.set_font('Arial', '', 9)
-        for fname, val in rows:
-            label = fname.encode('ascii', 'ignore').decode('ascii')
-            label = label[:60] + '...' if len(label) > 60 else label
-            pdf.cell(120, 6, label, 1, 0, 'L')
-            pdf.cell(20, 6, f'{val:+.3f}', 1, 1, 'C')
-    else:
-        # Fall back to showing top absolute feature values (scaled numerically)
-        ser = features_df.iloc[0]
-        items = [(_friendly(k), float(v)) for k, v in ser.items()]
-        rows = sorted(items, key=lambda x: abs(x[1]), reverse=True)[:10]
-
-        pdf.set_font('Arial', 'B', 10)
-        pdf.cell(120, 7, 'Feature (Business Name)', 1, 0, 'L')
-        pdf.cell(20, 7, 'Value', 1, 1, 'C')
-        pdf.set_font('Arial', '', 9)
-        for fname, val in rows:
-            label = fname.encode('ascii', 'ignore').decode('ascii')
-            label = label[:60] + '...' if len(label) > 60 else label
-            pdf.cell(120, 6, label, 1, 0, 'L')
-            pdf.cell(20, 6, f'{val:.2f}', 1, 1, 'C')
-
-    pdf.ln(5)
-
-    # ------------------------------------------------------------------ #
-    # MODEL INFORMATION (from final_metadata.json)
-    # ------------------------------------------------------------------ #
-    pdf.chapter_title('Model Information')
-
-    model_info = f"""
-Model: {FINAL_METADATA.get('best_model', 'Model')}
-Features: {FINAL_METADATA.get('n_features', 0)} domain-engineered features
-Training Samples: {FINAL_METADATA.get('n_samples_train', 0):,}
-Test Samples: {FINAL_METADATA.get('n_samples_test', 0):,}
-Operating Threshold: {int(round(OPTIMAL_THRESHOLD*100))}%
-
-Performance (Test):
-- AUC-ROC: {FINAL_METADATA.get('best_model_auc', 0):.4f}
-- Precision: {FINAL_METADATA.get('best_model_precision', 0):.3f}
-- Recall: {FINAL_METADATA.get('best_model_recall', 0):.3f}
-- F1-Score: {FINAL_METADATA.get('best_model_f1', 0):.3f}
-
-This prediction is based on a machine learning model trained on historical
-delivery patterns and order characteristics. Use alongside operational context.
+    Returns
+    -------
+    bytes
+        PDF file bytes suitable for Streamlit's st.download_button.
     """
-    pdf.chapter_body(model_info.strip())
+    meta = load_metadata()                                              # load metadata
+    thr = float(meta.get("optimal_threshold", 0.5))                     # threshold
+    bands = _bands_from_meta(meta)                                      # cutpoints
 
-    # ------------------------------------------------------------------ #
-    # DISCLAIMER
-    # ------------------------------------------------------------------ #
-    pdf.ln(10)
-    pdf.set_font('Arial', 'I', 8)
-    pdf.set_text_color(128, 128, 128)
-    pdf.multi_cell(
-        0,
-        4,
-        "DISCLAIMER: This risk assessment is generated by a machine learning model and should be "
-        "used as a decision-support tool. Actual outcomes may vary based on factors not captured "
-        "in the model. Apply business judgment when making operational decisions."
+    # Defensive copies / typed columns
+    df = scored_df.copy()                                               # copy so we don't mutate
+    if "score" in df.columns:                                           # ensure numeric 'score'
+        df["score"] = pd.to_numeric(df["score"], errors="coerce").fillna(0.0).clip(0.0, 1.0)
+
+    # Summary stats
+    n_rows = len(df)                                                    # total rows
+    avg_score = float(df["score"].mean()) if "score" in df.columns else 0.0   # mean prob
+    meets = int(df.get("meets_threshold", pd.Series([], dtype=bool)).sum()) if "meets_threshold" in df.columns else 0
+    not_meets = int(n_rows - meets)                                     # count not meeting threshold
+
+    # Band counts (if present) or derive from score
+    if "risk_band" in df.columns:
+        band_counts = df["risk_band"].value_counts().to_dict()          # existing mapping
+    else:
+        # derive labels from scores using current metadata
+        band_counts = {"Low": 0, "Medium": 0, "High": 0}
+        if "score" in df.columns:
+            for p in df["score"]:
+                band_counts[_band_label_from_prob(float(p), bands)] += 1
+
+    # Build the PDF
+    pdf = RiskReportPDF(title="Batch Prediction Summary")               # new PDF
+    pdf.add_page()                                                      # first page
+
+    # --- Overview -------------------------------------------------------------
+    pdf.section_title("Overview")
+    pdf.key_value("Rows scored", f"{n_rows:,}")                         # row count
+    pdf.key_value("Average probability", f"{avg_score:.4f}  ({avg_score*100:.2f}%)")  # mean prob
+    pdf.key_value("Operating threshold", f"{thr:.4f}  ({thr*100:.2f}%)")              # threshold
+    pdf.key_value("Predictions ≥ threshold", f"{meets:,}")              # meets count
+    pdf.key_value("Predictions < threshold", f"{not_meets:,}")          # not meets
+
+    pdf.ln(1)                                                           # spacing
+
+    # --- Band distribution ----------------------------------------------------
+    pdf.section_title("Risk Band Distribution")
+    # Render a small table with band counts (Low/Medium/High)
+    rows = [["Band", "Count"]]
+    for label in ["Low", "Medium", "High"]:
+        rows.append([label, f"{int(band_counts.get(label, 0)):,}"])
+    pdf.small_table(rows, col_widths=[60, 40])                          # small table
+
+    # --- Preview table (optional) ---------------------------------------------
+    if n_rows > 0:
+        pdf.section_title(f"Data Preview (first {min(sample_preview_rows, n_rows)} rows)")
+        # Pick a compact set of columns for preview
+        show_cols = [c for c in ["order_purchase_timestamp", "estimated_delivery_date",
+                                 "sum_price", "sum_freight", "n_items", "n_sellers",
+                                 "payment_type", "mode_category", "customer_state",
+                                 "score", "risk_band", "meets_threshold"] if c in df.columns]
+        preview = df[show_cols].head(sample_preview_rows)              # slice safe preview
+
+        # Build table rows (header + body)
+        header = [str(c) for c in preview.columns]                     # header row
+        body = [[str(x) for x in row] for _, row in preview.iterrows()]# body rows
+        pdf.small_table([header] + body)                               # render table
+
+    # --- Disclaimer ------------------------------------------------------------
+    pdf.ln(2)
+    pdf.set_font("Arial", "I", 8)
+    pdf.set_text_color(120, 120, 120)
+    pdf.multi_cell(0, 4,
+        "NOTE: Band assignments reflect the current application metadata cut points (Low/Medium/High). "
+        "Use these results to prioritize review and interventions at scale."
     )
 
-    pdf.ln(5)
-    pdf.set_font('Arial', 'B', 9)
-    pdf.set_text_color(52, 73, 94)
-    pdf.cell(0, 5, 'Generated by Supply Chain Delay Prediction System', 0, 1, 'C')
-    pdf.set_font('Arial', '', 8)
-    pdf.set_text_color(128, 128, 128)
-    pdf.cell(0, 4, f'Report ID: {datetime.utcnow().strftime("%Y%m%d%H%M%S")}', 0, 1, 'C')
-
-    # Return as bytes for Streamlit download_button
-    return bytes(pdf.output())
+    # Output bytes
+    return pdf.output(dest="S")                                         # return bytes for download
