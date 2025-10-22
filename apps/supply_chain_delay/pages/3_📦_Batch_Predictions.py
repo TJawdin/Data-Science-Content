@@ -1,369 +1,333 @@
 # pages/3_📦_Batch_Predictions.py
-# Purpose: Batch scoring with three capabilities:
-#   (A) Upload CSV and score every shipment
-#   (B) Auto-generate a realistic demo dataset (and score it)
-#   (C) Generate a blank CSV template with all required columns
-#
-# This page is metadata-driven:
-# - Reads threshold (0–1) and risk bands (0–100) from artifacts/final_metadata.json
-# - Reads required input spec from artifacts/feature_metadata.json when available
-# - Uses utils.model_loader.predict_batch for inference (with feature engineering if present)
+# Purpose: Batch scoring using RAW, user-friendly columns (not engineered 32).
+# Features:
+#   (A) Upload a raw CSV → clean → feature_engineering → model → scored CSV
+#   (B) Auto-generate a RAW demo dataset (and score it)
+#   (C) Generate a blank RAW template with required columns
+#   (D) Explain predictions for selected rows (engineered features + importance-weighted heuristic)
 #
 # Notes:
-# - Thorough data cleaning occurs prior to prediction
-# - All generated CSVs are downloadable from the UI
+# - predict_batch() internally calls calculate_features() to transform RAW → engineered.
+# - Section D is an interpretability aid:
+#     * Shows the engineered features for selected rows (the exact model inputs).
+#     * Computes a heuristic ranking using LightGBM feature_importances_ if available.
+#       This is NOT SHAP—just a directional proxy. We label it clearly.
+#     * If static SHAP PNGs exist in artifacts/, we render them as global interpretability context.
+#
+# References:
+# - Python:  https://docs.python.org/3/
+# - Pandas:  https://pandas.pydata.org/docs/
 
-from __future__ import annotations                   # postpone evaluation of annotations for type hints
-import io                                            # in-memory bytes buffer for CSV reading/writing
-import json                                          # read JSON metadata files
-from pathlib import Path                             # filesystem-safe paths
-from typing import Any, Dict, List, Tuple            # type hints
-import random                                        # random sampling for demo dataset
-import math                                          # numeric helpers
-import pandas as pd                                  # dataframe operations
-import numpy as np                                   # numeric array ops
-import streamlit as st                               # Streamlit UI elements
+from __future__ import annotations                        # postpone annotations for clarity
+import io                                                # read uploaded CSV bytes
+from typing import Any, Dict, List, Tuple                # typing helpers
+from pathlib import Path                                 # filesystem-safe paths
+from datetime import date, time                          # for demo datetime construction
+import random                                            # RNG for demo data
+import numpy as np                                       # numeric ops
+import pandas as pd                                      # dataframe ops
+import streamlit as st                                   # Streamlit UI
 
-# Centralized metadata + prediction helpers from utils
-from utils.model_loader import load_metadata, predict_batch  # import metadata loader and batch predictor
+# Central helpers
+from utils.model_loader import load_metadata, predict_batch, load_model  # metadata, scoring, and model access
+from utils.feature_engineering import calculate_features                 # to echo engineered features in Section D
 
+# ------------------------------------------------------------------------------
+# RAW schema (match Single page)
+# ------------------------------------------------------------------------------
+RAW_REQUIRED_COLUMNS: List[str] = [
+    "order_purchase_timestamp",        # ISO-like "YYYY-MM-DDTHH:MM:SS"
+    "estimated_delivery_date",         # ISO-like "YYYY-MM-DDTHH:MM:SS"
+    "sum_price",                       # R$
+    "sum_freight",                     # R$
+    "n_items",                         # int
+    "n_sellers",                       # int
+    "payment_type",                    # {"credit_card","boleto","debit_card","voucher","not_defined"}
+    "max_installments",                # int
+    "mode_category",                   # text (e.g., "bed_bath_table")
+    "customer_city",                   # text (e.g., "sao paulo")
+    "customer_state",                  # text (e.g., "SP")
+]
 
-# -----------------------------------------------------------------------------
-# Utility: locate the artifacts directory
-# -----------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# Utilities
+# ------------------------------------------------------------------------------
 def _artifacts_dir() -> Path:
-    """Return absolute path to the local artifacts directory."""
-    return Path(__file__).resolve().parents[1] / "artifacts"   # pages/.. → apps/supply_chain_delay/artifacts
+    """Path to local artifacts directory next to the app."""
+    return Path(__file__).resolve().parents[1] / "artifacts"  # pages/.. → artifacts
 
+def _clean_df_raw(df: pd.DataFrame) -> pd.DataFrame:
+    """Basic cleaning for raw uploads: standardize headers, trim, coerce numerics, uppercase state."""
+    df = df.copy()
+    df.columns = [str(c).strip() for c in df.columns]            # strip header whitespace
+    df = df.loc[:, ~df.columns.duplicated(keep="first")]         # drop duplicated headers
+    for c in df.select_dtypes(include=["object"]).columns:       # trim strings
+        df[c] = df[c].astype(str).str.strip()
+    # Coerce numerics safely (NaN on failure)
+    for c in ["sum_price", "sum_freight", "n_items", "n_sellers", "max_installments"]:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+    # Fill numeric NA with conservative defaults
+    for c in ["sum_price", "sum_freight"]:
+        if c in df.columns:
+            df[c] = df[c].fillna(0.0)
+    for c in ["n_items", "n_sellers", "max_installments"]:
+        if c in df.columns:
+            df[c] = df[c].fillna(1).astype(int)
+    # Uppercase state codes
+    if "customer_state" in df.columns:
+        df["customer_state"] = df["customer_state"].str.upper()
+    return df
 
-# -----------------------------------------------------------------------------
-# Load feature metadata (optional), which defines required columns, types, choices
-# -----------------------------------------------------------------------------
-def _load_feature_metadata() -> Dict[str, Any]:
-    """Load artifacts/feature_metadata.json if present; else return {}."""
-    fpath = _artifacts_dir() / "feature_metadata.json"         # feature metadata path
-    if not fpath.exists():                                     # if file missing
-        return {}                                              # return empty dict
+def _demo_raw_row() -> Dict[str, Any]:
+    """Generate a single realistic RAW row."""
+    year = np.random.choice([2017, 2018])                   # Olist-era years
+    month = np.random.randint(1, 13)
+    day = np.random.randint(1, 28)
+    hour = np.random.randint(0, 24)
+    minute = np.random.randint(0, 60)
+    purch = pd.Timestamp(year=year, month=month, day=day, hour=hour, minute=minute)
+    est = purch + pd.Timedelta(days=int(np.random.randint(3, 20)))  # 3–19 days lead time
+
+    def _choice(seq, p=None):
+        return np.random.choice(seq, p=p)
+
+    return {
+        "order_purchase_timestamp": purch.strftime("%Y-%m-%dT%H:%M:%S"),
+        "estimated_delivery_date": est.strftime("%Y-%m-%dT%H:%M:%S"),
+        "sum_price": float(np.round(np.random.gamma(2.0, 60.0), 2)),
+        "sum_freight": float(np.round(np.random.gamma(1.5, 12.0), 2)),
+        "n_items": int(np.clip(np.random.poisson(2) + 1, 1, 6)),
+        "n_sellers": int(np.clip(np.random.poisson(1) + 1, 1, 3)),
+        "payment_type": _choice(["credit_card","boleto","debit_card","voucher","not_defined"], p=[0.65,0.20,0.08,0.05,0.02]),
+        "max_installments": int(np.clip(int(np.random.exponential(1.2)) + 1, 1, 12)),
+        "mode_category": _choice([
+            "bed_bath_table","health_beauty","sports_leisure","computers_accessories",
+            "furniture_decor","watches_gifts","housewares","auto","toys","stationery"
+        ]),
+        "customer_city": _choice(["sao paulo","rio de janeiro","belo horizonte","curitiba","campinas","porto alegre"]),
+        "customer_state": _choice(["SP","RJ","MG","PR","RS","BA","ES","SC","GO","DF"]),
+    }
+
+def _demo_raw_frame(n_rows: int = 200, seed: int = 42) -> pd.DataFrame:
+    """Generate a RAW demo DataFrame with required columns and realistic ranges."""
+    random.seed(int(seed))
+    np.random.seed(int(seed))
+    rows = [_demo_raw_row() for _ in range(int(n_rows))]
+    return pd.DataFrame(rows, columns=RAW_REQUIRED_COLUMNS)  # enforce header order
+
+# ------------------------------------------------------------------------------
+# Page setup + metadata tiles
+# ------------------------------------------------------------------------------
+st.set_page_config(page_title="Batch Predictions — Supply Chain Delay", page_icon="📦", layout="wide")
+st.title("📦 Batch Predictions")
+st.caption("Upload a raw CSV to score shipments, or generate a demo/template CSV below.")
+st.markdown("---")
+
+meta = load_metadata()                                   # read final_metadata.json
+thr = float(meta.get("optimal_threshold", 0.5))          # 0–1 threshold
+rb = meta.get("risk_bands", {})                          # risk bands dict
+low_max = int(rb.get("low_max", 30))                     # %
+med_max = int(rb.get("med_max", 67))                     # %
+auc = float(meta.get("best_model_auc", 0.0))             # AUC metric
+
+t1, t2, t3, t4 = st.columns(4)
+t1.metric("Threshold", f"{thr:.6f}", f"{thr*100:.2f}%")
+t2.metric("Low Band (≤)", f"{low_max}%")
+t3.metric("Medium Band (≤)", f"{med_max}%")
+t4.metric("AUC-ROC", f"{auc:.4f}")
+st.markdown("---")
+
+st.info(f"**Required RAW columns:** {', '.join(RAW_REQUIRED_COLUMNS)}")
+
+# ------------------------------------------------------------------------------
+# (A) Upload RAW CSV and score
+# ------------------------------------------------------------------------------
+st.subheader("A) Upload CSV and Score")
+uploaded = st.file_uploader("Choose a CSV with the required RAW columns.", type=["csv"])
+
+df_scored: pd.DataFrame | None = None      # will hold scored output for reuse in Section D
+df_clean: pd.DataFrame | None = None       # cleaned RAW input (for engineered echo later)
+
+if uploaded is not None:
     try:
-        with fpath.open("r", encoding="utf-8") as f:           # open file
-            data = json.load(f)                                # parse JSON
-        return data if isinstance(data, dict) else {}          # ensure dict
-    except Exception:
-        return {}                                              # safe fallback if read fails
-
-
-# -----------------------------------------------------------------------------
-# Derive required columns and spec from feature metadata
-# Expected schema example (flexible):
-# { "inputs": [ {"name":"payment_value","type":"float","required":true,"default":0.0}, ... ] }
-# -----------------------------------------------------------------------------
-def _extract_inputs_spec(feat_meta: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Return the list of input specs from feature metadata (or [])."""
-    items = feat_meta.get("inputs", [])                        # read list under "inputs"
-    return items if isinstance(items, list) else []            # ensure list
-
-
-def _required_columns(inputs_spec: List[Dict[str, Any]]) -> List[str]:
-    """Return ordered list of required input names from spec."""
-    cols = []                                                  # initialize list
-    for spec in inputs_spec:                                   # iterate specs
-        if spec.get("required", False):                        # check required flag
-            name = str(spec.get("name", "")).strip()           # get clean name
-            if name:                                           # non-empty
-                cols.append(name)                              # append
-    return cols                                                # return list
-
-
-def _all_declared_columns(inputs_spec: List[Dict[str, Any]]) -> List[str]:
-    """Return ordered list of all declared input names (required + optional)."""
-    cols = []                                                  # initialize
-    for spec in inputs_spec:                                   # iterate
-        name = str(spec.get("name", "")).strip()               # read name
-        if name and name not in cols:                          # unique
-            cols.append(name)                                  # append
-    return cols                                                # return list
-
-
-# -----------------------------------------------------------------------------
-# Data cleaning: trim text, dedupe columns, coerce numeric-like columns
-# -----------------------------------------------------------------------------
-def _clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """Generic, robust cleaning for uploaded data."""
-    df = df.copy()                                             # copy to avoid mutating original
-    df.columns = [str(c).strip() for c in df.columns]          # strip whitespace from column names
-    df = df.loc[:, ~df.columns.duplicated(keep="first")]       # drop duplicate-named columns
-    for c in df.select_dtypes(include=["object"]).columns:     # for object/string columns
-        df[c] = df[c].astype(str).str.strip()                  # trim whitespace from values
-
-    # Heuristic numeric coercion for columns that look numeric
-    for c in df.columns:                                       # iterate columns
-        if pd.api.types.is_numeric_dtype(df[c]):               # skip numeric columns
-            continue                                           # already numeric
-        sample = df[c].dropna().astype(str).head(300)          # sample text values
-        if len(sample) == 0:                                   # skip if empty
-            continue
-        numeric_like = sample.str.fullmatch(                   # fraction of numeric-like strings
-            r"[-+]?\d*\.?\d+(e[-+]?\d+)?", case=False
-        ).mean()
-        if numeric_like >= 0.9:                                # threshold for coercion
-            df[c] = pd.to_numeric(df[c], errors="coerce")      # coerce to float (NaN on failure)
-
-    # If user mistakenly included a 'score' column, clip it for safety (won’t be used by model input)
-    if "score" in df.columns:                                  # check presence
-        df["score"] = pd.to_numeric(df["score"], errors="coerce").clip(0.0, 1.0)  # normalize score
-    return df                                                  # return cleaned frame
-
-
-# -----------------------------------------------------------------------------
-# CSV generators: blank template + realistic demo dataset
-# -----------------------------------------------------------------------------
-def _blank_template_df(inputs_spec: List[Dict[str, Any]]) -> pd.DataFrame:
-    """Build a zero-row DataFrame with all declared columns (required first)."""
-    req = _required_columns(inputs_spec)                       # required column names
-    all_cols = _all_declared_columns(inputs_spec)              # all declared column names
-    ordered = req + [c for c in all_cols if c not in req]      # required first, then remaining
-    return pd.DataFrame(columns=ordered)                       # empty DF with headers only
-
-
-def _random_value_for_spec(spec: Dict[str, Any]) -> Any:
-    """Generate a plausible random value for one input spec."""
-    itype = str(spec.get("type", "text")).lower()              # read input type
-    default = spec.get("default", None)                        # read default (if any)
-    choices = spec.get("choices", None)                        # read categorical choices
-
-    # If categorical with choices, sample from choices (fall back to default for safety)
-    if itype in {"category", "categorical", "select"} and isinstance(choices, list) and len(choices) > 0:
-        return random.choice(choices)                          # random category
-
-    # Numeric generation with soft bounds if provided in spec (min/max)
-    if itype in {"int", "integer"}:                            # integer field
-        lo = int(spec.get("min", 0))                           # min bound
-        hi = int(spec.get("max", 100))                         # max bound
-        if lo > hi:                                            # ensure sane bounds
-            lo, hi = hi, lo                                    # swap if reversed
-        return random.randint(lo, hi)                          # random int in range
-    if itype in {"float", "double", "number", "numeric"}:      # float field
-        lo = float(spec.get("min", 0.0))                       # min bound
-        hi = float(spec.get("max", 100.0))                     # max bound
-        if lo > hi:                                            # sanitize bounds
-            lo, hi = hi, lo                                    # swap if reversed
-        val = random.random() * (hi - lo) + lo                 # uniform in [lo, hi]
-        return round(val, 4)                                   # tidy precision for UI
-
-    # Boolean fields default to False unless specified
-    if itype in {"bool", "boolean"}:                           # boolean type
-        if default is not None:                                # default provided
-            return bool(default)                               # cast default
-        return random.choice([True, False])                    # random boolean
-
-    # Datetime-like: simple ISO-ish strings (let FE parse exact format if needed)
-    if itype in {"datetime", "date"}:                          # datetime type
-        # Generate a date range; here use a plausible 2017–2018 Olist window
-        y = random.choice([2017, 2018])                        # pick a year
-        m = random.randint(1, 12)                              # month 1-12
-        d = random.randint(1, 28)                              # day safe 1-28
-        hh = random.randint(0, 23)                             # hour 0-23
-        mm = random.randint(0, 59)                             # minute 0-59
-        return f"{y:04d}-{m:02d}-{d:02d}T{hh:02d}:{mm:02d}:00" # ISO-like string
-
-    # Default: text fields (use default if present, else a placeholder)
-    if default not in [None, ""]:                              # non-empty default
-        return str(default)                                    # return default
-    return "unknown"                                           # fallback text
-
-
-def _demo_dataset_df(inputs_spec: List[Dict[str, Any]], n_rows: int = 200) -> pd.DataFrame:
-    """Generate a realistic demo dataset with n_rows, based on feature metadata."""
-    cols = _all_declared_columns(inputs_spec)                  # declared columns
-    if not cols:                                               # if no spec available
-        # Fallback minimal demo schema when no metadata is present
-        cols = ["payment_value", "customer_city", "order_purchase_timestamp"]  # minimal set
-        inputs_spec = [                                        # synthetic spec for demo
-            {"name": "payment_value", "type": "float", "min": 10.0, "max": 500.0},
-            {"name": "customer_city", "type": "category", "choices": ["sao paulo", "rio de janeiro", "belo horizonte", "curitiba"]},
-            {"name": "order_purchase_timestamp", "type": "datetime"}
-        ]
-    rows: List[Dict[str, Any]] = []                            # container for rows
-    for _ in range(int(n_rows)):                               # loop n_rows times
-        row: Dict[str, Any] = {}                               # init row dict
-        for spec in inputs_spec:                               # iterate spec
-            name = str(spec.get("name", "")).strip()           # get name
-            if not name:                                       # skip if empty
-                continue
-            row[name] = _random_value_for_spec(spec)           # generate value
-        rows.append(row)                                       # append row
-    df = pd.DataFrame(rows, columns=cols)                      # build DataFrame with column order
-    return df                                                  # return demo DF
-
-
-# -----------------------------------------------------------------------------
-# Page scaffold (metrics + controls)
-# -----------------------------------------------------------------------------
-st.set_page_config(page_title="Batch Predictions — Supply Chain Delay", page_icon="📦", layout="wide")  # configure page
-st.title("📦 Batch Predictions")                                 # page title
-st.caption("Upload a CSV to score shipments, or generate a demo/template CSV below.")      # short subtitle
-st.markdown("---")                                               # divider
-
-# Load model training metadata (threshold + bands + metrics)
-meta = load_metadata()                                           # load final_metadata.json
-thr = float(meta.get("optimal_threshold", 0.5))                  # threshold 0–1
-rb = meta.get("risk_bands", {})                                  # risk bands dict
-low_max = int(rb.get("low_max", 30))                             # low band upper cutoff (%)
-med_max = int(rb.get("med_max", 67))                             # medium band upper cutoff (%)
-
-# Top metrics summary
-col1, col2, col3, col4 = st.columns(4)                           # four metric tiles
-with col1:
-    st.metric("Optimal Threshold", f"{thr:.6f}", f"{thr*100:.2f}%")  # probability + percent
-with col2:
-    st.metric("Low Band (≤)", f"{low_max}%")                     # band display
-with col3:
-    st.metric("Medium Band (≤)", f"{med_max}%")                  # band display
-with col4:
-    st.metric("AUC-ROC", f"{float(meta.get('best_model_auc', 0.0)):.4f}")  # model AUC
-
-st.markdown("---")                                               # divider
-
-# Load feature metadata for schema-driven behaviors
-feat_meta = _load_feature_metadata()                              # feature spec JSON
-inputs_spec = _extract_inputs_spec(feat_meta)                     # list of input specs
-required_cols = _required_columns(inputs_spec)                    # required columns list
-all_cols = _all_declared_columns(inputs_spec)                     # all declared columns list
-
-# Explain required columns (if known)
-if required_cols:                                                 # if we have a spec
-    st.info(f"**Required columns**: {', '.join(required_cols)}")  # show required column names
-else:
-    st.info("No `feature_metadata.json` found. Upload any CSV your model’s feature engineering can handle. For convenience, you can generate a demo dataset or a blank template below.")
-
-# -----------------------------------------------------------------------------
-# Section A: Upload CSV and Score
-# -----------------------------------------------------------------------------
-st.subheader("A) Upload CSV and Score")                           # section header
-uploaded = st.file_uploader("Choose a CSV file with your shipment fields.", type=["csv"])  # file uploader
-
-if uploaded is not None:                                          # if a file was uploaded
-    try:
-        raw_bytes = uploaded.read()                               # read file bytes
-        df_in = pd.read_csv(io.BytesIO(raw_bytes))                # parse CSV
+        df_in = pd.read_csv(io.BytesIO(uploaded.read()))
     except Exception as e:
-        st.error(f"Could not read CSV: {e}")                      # show parse error
-        st.stop()                                                 # stop further execution
+        st.error(f"Could not read CSV: {e}")
+        st.stop()
 
-    with st.expander("Preview & Cleaning (pre-prediction)", expanded=True):  # preview panel
-        st.write("**First 12 rows (raw):**")                      # label
-        st.dataframe(df_in.head(12))                              # show preview
-        df_clean = _clean_dataframe(df_in)                        # run cleaning
-        st.write("**Detected shape after cleaning:** ", df_clean.shape)  # show shape
+    with st.expander("Preview & Validation", expanded=True):
+        st.write("**First 12 rows (raw):**")
+        st.dataframe(df_in.head(12))
+        df_clean = _clean_df_raw(df_in)
+        st.write("**Shape after cleaning:**", df_clean.shape)
+        # Strict header check
+        missing = [c for c in RAW_REQUIRED_COLUMNS if c not in df_clean.columns]
+        if missing:
+            st.error(f"Missing required columns: {missing}")
+            st.stop()
+        # Reorder for traceability
+        df_clean = df_clean[RAW_REQUIRED_COLUMNS]
 
-        # If we know required columns, check their presence and order
-        if required_cols:                                         # if schema known
-            missing = [c for c in required_cols if c not in df_clean.columns]  # find missing required
-            if missing:                                           # if any missing
-                st.error(f"Missing required columns: {missing}. Please fix your file or use the template generator below.")
-                st.stop()                                         # halt if missing
-
-    # Score the cleaned data
-    with st.spinner("Scoring shipments…"):                        # show spinner
+    with st.spinner("Scoring shipments…"):
         try:
-            df_scored = predict_batch(df_clean)                   # batch predict via utils
+            df_scored = predict_batch(df_clean)  # adds columns: score, meets_threshold, risk_band
         except Exception as e:
-            st.error(f"Batch prediction failed: {e}")             # display error
-            st.stop()                                             # stop on error
+            st.error(f"Batch prediction failed: {e}")
+            st.stop()
 
-    st.success(f"Scored {len(df_scored):,} shipments successfully.")  # success message
-    st.dataframe(df_scored.head(25))                              # show top rows of result
-
-    # Download scored CSV
-    scored_bytes = df_scored.to_csv(index=False).encode("utf-8")  # serialize to CSV
-    st.download_button(                                           # download button
+    st.success(f"Scored {len(df_scored):,} shipments successfully.")
+    st.dataframe(df_scored.head(25))
+    st.download_button(
         label="⬇️ Download Scored CSV",
-        data=scored_bytes,
+        data=df_scored.to_csv(index=False).encode("utf-8"),
         file_name="batch_scored.csv",
         mime="text/csv"
     )
 
-    # Quick distribution chart by risk band (if present)
-    st.markdown("---")                                           # divider
-    st.subheader("Risk Band Distribution")                       # chart header
-    if "risk_band" in df_scored.columns:                         # check presence
-        counts = (df_scored["risk_band"]                         # count rows per band
-                  .value_counts()
-                  .rename_axis("band")
-                  .reset_index(name="count"))
-        st.bar_chart(counts.set_index("band"))                   # display bar chart
+    st.markdown("---")
+    st.subheader("Risk Band Distribution")
+    if "risk_band" in df_scored.columns:
+        counts = df_scored["risk_band"].value_counts().rename_axis("band").reset_index(name="count")
+        st.bar_chart(counts.set_index("band"))
     else:
-        st.info("No `risk_band` column found in output. Ensure band mapping is enabled in your model loader.")
+        st.info("No `risk_band` column found in output. Check band mapping in the model loader.")
 
-st.markdown("---")                                               # divider
+st.markdown("---")
 
-# -----------------------------------------------------------------------------
-# Section B: Generate Demo Dataset (and Score It)
-# -----------------------------------------------------------------------------
-st.subheader("B) Generate Demo Dataset")                         # section header
-demo_cols = st.columns([2, 2, 1, 2])                             # columns for controls
-with demo_cols[0]:
-    n_rows = st.number_input("Number of demo rows", min_value=10, max_value=5000, value=200, step=10)  # row count
-with demo_cols[1]:
-    seed = st.number_input("Random seed", min_value=0, max_value=999999, value=42, step=1)             # RNG seed
-with demo_cols[2]:
-    gen_btn = st.button("Generate Demo")                         # generate button
-with demo_cols[3]:
-    auto_score = st.checkbox("Auto-score after generation", value=True)  # auto-score flag
+# ------------------------------------------------------------------------------
+# (B) Generate RAW demo dataset (and score it)
+# ------------------------------------------------------------------------------
+st.subheader("B) Generate Demo Dataset")
+cA, cB, cC, cD = st.columns([2, 2, 1, 2])
+with cA:
+    n_rows = st.number_input("Rows", min_value=10, max_value=5000, value=200, step=10)
+with cB:
+    seed = st.number_input("Random seed", min_value=0, max_value=999999, value=42, step=1)
+with cC:
+    gen = st.button("Generate Demo")
+with cD:
+    auto_score = st.checkbox("Auto-score", value=True)
 
-if gen_btn:                                                      # on click generate
-    random.seed(int(seed))                                       # seed Python RNG
-    np.random.seed(int(seed))                                    # seed NumPy RNG
-    demo_df = _demo_dataset_df(inputs_spec, int(n_rows))         # build demo data
-    st.success(f"Generated {len(demo_df):,} demo rows.")         # success message
-    st.dataframe(demo_df.head(25))                               # show preview
-
-    # Download raw demo CSV
-    demo_bytes = demo_df.to_csv(index=False).encode("utf-8")     # bytes for download
+if gen:
+    demo = _demo_raw_frame(int(n_rows), int(seed))
+    st.success(f"Generated {len(demo):,} demo rows.")
+    st.dataframe(demo.head(25))
     st.download_button(
         label="⬇️ Download Demo CSV",
-        data=demo_bytes,
-        file_name="demo_batch.csv",
+        data=demo.to_csv(index=False).encode("utf-8"),
+        file_name="demo_batch_raw.csv",
         mime="text/csv"
     )
-
-    # Optionally score the demo DF
-    if auto_score:                                               # if checkbox set
-        with st.spinner("Scoring demo dataset…"):                # spinner
+    if auto_score:
+        with st.spinner("Scoring demo dataset…"):
             try:
-                demo_scored = predict_batch(_clean_dataframe(demo_df))  # score cleaned demo
+                demo_scored = predict_batch(_clean_df_raw(demo))
             except Exception as e:
-                st.error(f"Demo scoring failed: {e}")            # error display
-                st.stop()                                        # stop
-        st.success("Demo dataset scored.")                       # success message
-        st.dataframe(demo_scored.head(25))                       # show sample
-
-        # Download scored demo CSV
-        demo_scored_bytes = demo_scored.to_csv(index=False).encode("utf-8")  # serialize
+                st.error(f"Demo scoring failed: {e}")
+                st.stop()
+        st.success("Demo dataset scored.")
+        st.dataframe(demo_scored.head(25))
         st.download_button(
             label="⬇️ Download Scored Demo CSV",
-            data=demo_scored_bytes,
+            data=demo_scored.to_csv(index=False).encode("utf-8"),
             file_name="demo_batch_scored.csv",
             mime="text/csv"
         )
 
-st.markdown("---")                                               # divider
+st.markdown("---")
 
-# -----------------------------------------------------------------------------
-# Section C: Generate Blank Template CSV
-# -----------------------------------------------------------------------------
-st.subheader("C) Generate Blank Template")                       # section header
-if all_cols:                                                     # if we know the schema
-    template_df = _blank_template_df(inputs_spec)                # build zero-row template
-else:
-    # Minimal fallback when feature metadata is not available
-    template_df = pd.DataFrame(columns=["payment_value", "customer_city", "order_purchase_timestamp"])  # minimal headers
-st.info("Download this template, fill in the required columns, and upload it in Section A to score your shipments.")  # helper text
-st.dataframe(template_df.head(5))                                # show empty structure (will be blank)
-template_bytes = template_df.to_csv(index=False).encode("utf-8") # serialize to CSV
+# ------------------------------------------------------------------------------
+# (C) Generate blank RAW template
+# ------------------------------------------------------------------------------
+st.subheader("C) Generate Blank Template")
+template = pd.DataFrame(columns=RAW_REQUIRED_COLUMNS)
+st.info("This template contains the exact RAW columns expected by the app. Fill it out and upload in Section A.")
+st.dataframe(template.head(5))
 st.download_button(
     label="⬇️ Download Blank Template CSV",
-    data=template_bytes,
-    file_name="batch_template.csv",
+    data=template.to_csv(index=False).encode("utf-8"),
+    file_name="batch_template_raw.csv",
     mime="text/csv"
 )
+
+st.markdown("---")
+
+# ------------------------------------------------------------------------------
+# (D) Why was this classified High/Medium/Low?
+# ------------------------------------------------------------------------------
+st.subheader("D) Why was this classified this way?")
+
+if df_scored is None or df_clean is None:
+    st.info("Upload and score a file in Section A to enable per-row explanations.")
+else:
+    # Option to pick top-N by score or manual indices
+    left, right = st.columns([1.2, 2])
+    with left:
+        top_n = st.number_input("Top N highest scores", min_value=1, max_value=min(50, len(df_scored)), value=min(5, len(df_scored)), step=1)
+        default_indices = df_scored.sort_values("score", ascending=False).head(int(top_n)).index.tolist()
+    with right:
+        selected = st.multiselect(
+            "Select specific row indices to inspect (defaults to Top N by score)",
+            options=list(df_scored.index),
+            default=default_indices
+        )
+
+    if not selected:
+        st.info("Select at least one row to explain.")
+    else:
+        # Compute engineered features for the selected rows so users see exactly what hit the model
+        engineered_subset = calculate_features(df_clean.loc[selected])  # transform RAW → engineered 32
+        st.markdown("**Engineered features sent to the model (subset):**")
+        st.dataframe(engineered_subset.head(len(selected)))
+
+        # Try to get LightGBM feature_importances_ for a heuristic ranking
+        try:
+            model, meta_ = load_model()                                 # load model object + metadata
+            importances = getattr(model, "feature_importances_", None)  # LightGBM/sklearn style
+            if importances is not None and len(importances) == engineered_subset.shape[1]:
+                # Normalize importances to [0,1] for weighting
+                imp = pd.Series(importances, index=engineered_subset.columns).astype(float)
+                imp_norm = (imp - imp.min()) / (imp.max() - imp.min() + 1e-9)
+
+                st.markdown("**Heuristic driver ranking (NOT SHAP):**")
+                for idx in selected:
+                    st.markdown(f"- **Row {idx}** — score: {df_scored.loc[idx, 'score']:.4f} • band: {df_scored.loc[idx, 'risk_band']}")
+                    row = engineered_subset.loc[idx]
+                    # Heuristic “salience” = |value| * normalized_importance (numeric + one-hot)
+                    # For categoricals (strings), we treat non-empty as 1.0
+                    vals = row.copy()
+                    for c in vals.index:
+                        if isinstance(vals[c], str):
+                            vals[c] = 1.0 if vals[c] else 0.0
+                    salience = vals.abs() * imp_norm
+                    topk = salience.sort_values(ascending=False).head(8)  # top 8 drivers
+                    # Show a tidy table of top drivers
+                    show = pd.DataFrame({
+                        "feature": topk.index,
+                        "value": row[topk.index].values,
+                        "importance": imp_norm[topk.index].round(4).values,
+                        "salience≈": topk.round(4).values
+                    })
+                    st.dataframe(show.reset_index(drop=True))
+            else:
+                st.info("Model importances unavailable or mismatched; showing engineered features only.")
+        except Exception:
+            st.info("Could not compute heuristic drivers from model importances. Showing engineered features only.")
+
+        # Optional: render global SHAP PNGs if present (context, not per-row)
+        art = _artifacts_dir()
+        shap_imgs = [
+            art / "shap_summary_lightgbm.png",
+            art / "shap_importance_lightgbm.png",
+            art / "shap_dependence_top_feature_lightgbm.png",
+        ]
+        any_found = False
+        for p in shap_imgs:
+            if p.exists():
+                if not any_found:
+                    st.markdown("**Global model context (static SHAP figures):**")
+                st.image(str(p), use_column_width=True)
+                any_found = True
+        if not any_found:
+            st.caption("Tip: Add SHAP PNGs to `artifacts/` to show global model context.")
