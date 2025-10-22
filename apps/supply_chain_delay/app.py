@@ -176,10 +176,13 @@ with m4:
 st.markdown("### 🏆 Optimization Results")
 o1, o2, o3 = st.columns(3)
 with o1:
-    st.metric("Precision", f"{100*metadata.get('precision', 0):.1f}%", "vs. baseline +Δ")
+    # Use the correct keys from final_metadata.json
+    prec = 100 * float(metadata.get("best_model_precision", metadata.get("precision", 0)))
+    st.metric("Precision", f"{prec:.1f}%", "vs. baseline +Δ")  # show as percent
 with o2:
-    st.metric("Optimal Threshold", f"{100*metadata.get('optimal_threshold', 0.5):.2f}%")
+    st.metric("Optimal Threshold", f"{100*float(metadata.get('optimal_threshold', 0.5)):.2f}%")
 with o3:
+    # Keep the tuning method if you store it; else show model type as a helpful label
     st.metric("Tuning Method", metadata.get("optimization_method", "RandomizedSearchCV"))
 
 st.markdown("---")
