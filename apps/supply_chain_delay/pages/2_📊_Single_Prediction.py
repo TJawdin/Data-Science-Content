@@ -1,442 +1,250 @@
-"""
-Single Prediction Page
-Interactive form for predicting late delivery risk for a single order
-"""
+# pages/2_📊_Single_Prediction.py
+# Purpose: Single-order prediction with robust input form, dynamic metadata-driven threshold/bands,
+#          and clean inference path that leverages feature engineering if available.
+# Notes:
+# - Attempts to auto-generate inputs from artifacts/feature_metadata.json
+# - Falls back to a minimalist manual entry mode if metadata is missing
+# - Cleans inputs (trim strings, coerce numerics) before scoring
+# - Displays score (0–1), threshold flag, and risk band (0–100 cutoff)
 
-import streamlit as st
-import pandas as pd
-import numpy as np
-import sys
-from pathlib import Path
+import json                                              # import json to load feature metadata
+from pathlib import Path                                 # import Path for OS-agnostic paths
+from typing import Any, Dict, List                       # typing helpers for clarity
+import pandas as pd                                      # import pandas for light cleaning/structuring
+import streamlit as st                                   # import Streamlit for the page UI
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Centralized loader/predictors from our upgraded utils
+from utils.model_loader import load_metadata, predict_single  # import metadata loader and single-inference
 
-from utils.feature_engineering import calculate_features, get_feature_descriptions
-from utils.model_loader import load_model, predict_single
-from utils.visualization import create_risk_gauge
+# -----------------------------------------------------------------------------
+# Page Identity (avoid set_page_config duplication across pages)
+# -----------------------------------------------------------------------------
+st.title("📊 Single Prediction")                         # render page title
+st.caption("Enter order details and get a real-time late-delivery risk score.")  # helpful subtitle
+st.markdown("---")                                      # visual divider
 
-# Page config
-st.set_page_config(
-    page_title="Single Prediction",
-    page_icon="📊",
-    layout="wide"
-)
-from utils.theme_adaptive import apply_adaptive_theme
+# -----------------------------------------------------------------------------
+# Load app-level metadata (threshold + bands)
+# -----------------------------------------------------------------------------
+meta: Dict[str, Any] = load_metadata()                   # read metadata dict from artifacts/final_metadata.json
+thr: float = float(meta.get("optimal_threshold", 0.5))   # read operating threshold (0–1)
+rb: Dict[str, Any] = meta.get("risk_bands", {})          # read risk bands dict
+low_max: int = int(rb.get("low_max", 30))                # low band cutoff as percent
+med_max: int = int(rb.get("med_max", 67))                # medium band cutoff as percent
 
-# Apply theme right after page config
-apply_adaptive_theme()
-# ============================================================================
-# Header
-# ============================================================================
+# Show quick context metrics
+c1, c2, c3, c4 = st.columns(4)                           # create four metric tiles
+with c1:                                                 # tile 1: threshold (probability)
+    st.metric("Optimal Threshold", f"{thr:.6f}", f"{thr*100:.2f}%")  # display both raw and percent
+with c2:                                                 # tile 2: AUC
+    st.metric("AUC-ROC", f"{float(meta.get('best_model_auc', 0.0)):.4f}")  # show AUC
+with c3:                                                 # tile 3: Low band
+    st.metric("Low Band (≤)", f"{low_max}%")            # low band upper bound
+with c4:                                                 # tile 4: Medium band
+    st.metric("Medium Band (≤)", f"{med_max}%")         # medium band upper bound
 
-st.title("📊 Single Order Prediction")
-st.markdown("""
-Enter order details below to predict late delivery risk in real-time.
-Get instant risk assessment, probability score, and actionable recommendations!
-""")
+st.markdown("---")                                      # divider
 
-st.markdown("---")
+# -----------------------------------------------------------------------------
+# Feature metadata loader (optional) to auto-build form controls
+# -----------------------------------------------------------------------------
+def _artifacts_dir() -> Path:
+    """Return absolute path to the local artifacts directory (apps/supply_chain_delay/artifacts)."""
+    return Path(__file__).resolve().parents[1] / "artifacts"  # pages/.. → repo apps/supply_chain_delay/artifacts
 
-# ============================================================================
-# Load Model
-# ============================================================================
+def _load_feature_metadata() -> Dict[str, Any]:
+    """
+    Load artifacts/feature_metadata.json if present.
+    Expected (flexible) structure example:
+    {
+      "inputs": [
+        {"name": "order_purchase_timestamp", "type": "datetime", "required": true},
+        {"name": "payment_value", "type": "float", "required": false, "default": 0.0},
+        {"name": "customer_city", "type": "category", "required": true, "choices": ["sao paulo", "rio de janeiro", ...]}
+      ]
+    }
+    """
+    fpath = _artifacts_dir() / "feature_metadata.json"   # compute feature metadata path
+    if not fpath.exists():                               # if metadata file is missing
+        return {}                                        # return empty dict to trigger fallback
+    try:                                                 # try reading the JSON
+        with fpath.open("r", encoding="utf-8") as f:     # open file safely
+            data = json.load(f)                          # parse JSON
+        if isinstance(data, dict):                       # ensure dictionary
+            return data                                  # return parsed metadata
+        return {}                                        # non-dict content fallback
+    except Exception:
+        return {}                                        # any read/parse error → fallback
 
-model = load_model()
+feat_meta: Dict[str, Any] = _load_feature_metadata()     # attempt to load feature metadata
+inputs_spec: List[Dict[str, Any]] = feat_meta.get("inputs", [])  # list of input specs (may be empty)
 
-if model is None:
-    st.error("⚠️ Model not found. Please copy your trained model to the artifacts folder.")
-    st.stop()
+# -----------------------------------------------------------------------------
+# Helper: clean a single input-row dict (trim strings, coerce numerics)
+# -----------------------------------------------------------------------------
+def _clean_single_input(raw: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Clean a flat dict of user inputs:
+    - Trim whitespace for string-ish values
+    - Coerce numeric strings to float where appropriate (heuristic if spec type is numeric)
+    """
+    cleaned: Dict[str, Any] = {}                         # initialize result dict
+    for k, v in raw.items():                             # iterate over key/value pairs
+        if isinstance(v, str):                           # if value is a string
+            v = v.strip()                                # trim whitespace
+        cleaned[k] = v                                   # assign cleaned value
+    # Attempt numeric coercion for obvious numeric-like values when spec hints exist
+    type_map = {i.get("name"): i.get("type") for i in inputs_spec}  # map name → type from metadata
+    for name, val in list(cleaned.items()):              # iterate again for type-based coercion
+        t = (type_map.get(name) or "").lower()           # get declared type (if any)
+        if t in {"int", "integer"}:                      # integer fields
+            try:
+                cleaned[name] = int(float(val))          # coerce float-ish strings to int
+            except Exception:
+                pass                                     # leave as-is if coercion fails
+        elif t in {"float", "double", "number", "numeric"}:  # float fields
+            try:
+                cleaned[name] = float(val)               # coerce to float
+            except Exception:
+                pass                                     # leave as-is if coercion fails
+        # Dates/timestamps are left as strings; FE function should parse if needed
+    return cleaned                                       # return cleaned inputs
 
-# ============================================================================
-# Input Form
-# ============================================================================
+# -----------------------------------------------------------------------------
+# UI: build the input form (auto from metadata or fallback to key/value editor)
+# -----------------------------------------------------------------------------
+st.subheader("Enter Order Details")                      # section header
 
-st.markdown("## 📝 Enter Order Details")
+with st.form("single_prediction_form", clear_on_submit=False):  # begin form to aggregate inputs
+    form_values: Dict[str, Any] = {}                    # container for form inputs
 
-with st.form("order_input_form"):
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("### 📦 Order Information")
-        
-        num_items = st.number_input(
-            "Number of Items",
-            min_value=1,
-            max_value=20,
-            value=1,
-            help="Total number of items in the order"
-        )
-        
-        num_sellers = st.number_input(
-            "Number of Sellers",
-            min_value=1,
-            max_value=10,
-            value=1,
-            help="Number of different sellers fulfilling this order"
-        )
-        
-        total_order_value = st.number_input(
-            "Total Order Value ($)",
-            min_value=0.0,
-            value=120.0,
-            step=10.0,
-            help="Total monetary value of all items"
-        )
-        
-        total_shipping_cost = st.number_input(
-            "Total Shipping Cost ($)",
-            min_value=0.0,
-            value=8.0,
-            step=1.0,
-            help="Total cost of shipping"
-        )
-        
-        st.markdown("### 📏 Physical Characteristics")
-        
-        total_weight_g = st.number_input(
-            "Total Weight (grams)",
-            min_value=0,
-            value=800,
-            step=100,
-            help="Combined weight of all items"
-        )
-        
-        col_a, col_b, col_c = st.columns(3)
-        
-        with col_a:
-            avg_length_cm = st.number_input(
-                "Avg Length (cm)",
-                min_value=0.0,
-                value=25.0,
-                step=1.0
-            )
-        
-        with col_b:
-            avg_height_cm = st.number_input(
-                "Avg Height (cm)",
-                min_value=0.0,
-                value=18.0,
-                step=1.0
-            )
-        
-        with col_c:
-            avg_width_cm = st.number_input(
-                "Avg Width (cm)",
-                min_value=0.0,
-                value=12.0,
-                step=1.0
-            )
-    
-    with col2:
-        st.markdown("### 🗺️ Geographic Information")
-        
-        avg_shipping_distance_km = st.number_input(
-            "Shipping Distance (km)",
-            min_value=0,
-            value=80,
-            step=50,
-            help="Distance from warehouse to delivery address"
-        )
-        
-        is_cross_state = st.selectbox(
-            "Cross-State Shipping?",
-            options=[0, 1],
-            format_func=lambda x: "No" if x == 0 else "Yes",
-            help="Does this order cross state boundaries?"
-        )
-        
-        st.markdown("### 📅 Timing Information")
-        
-        estimated_days = st.number_input(
-            "Estimated Delivery Days",
-            min_value=1,
-            max_value=60,
-            value=12,
-            help="Promised delivery timeframe"
-        )
-        
-        order_weekday = st.selectbox(
-            "Order Day of Week",
-            options=[0, 1, 2, 3, 4, 5, 6],
-            format_func=lambda x: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 
-                                   'Friday', 'Saturday', 'Sunday'][x],
-            index=2,
-            help="Day when order was placed"
-        )
-        
-        order_month = st.selectbox(
-            "Order Month",
-            options=list(range(1, 13)),
-            format_func=lambda x: ['January', 'February', 'March', 'April', 'May', 'June',
-                                   'July', 'August', 'September', 'October', 'November', 'December'][x-1],
-            index=4,
-            help="Month when order was placed"
-        )
-        
-        order_hour = st.slider(
-            "Order Hour (24-hour format)",
-            min_value=0,
-            max_value=23,
-            value=14,
-            help="Time of day when order was placed"
-        )
-    
-    # Submit button
-    submitted = st.form_submit_button(
-        "🎯 Predict Late Delivery Risk",
-        use_container_width=True,
-        type="primary"
-    )
+    if inputs_spec:                                     # if we have a spec, build dynamic controls
+        # Split into columns to reduce vertical scrolling
+        cols = st.columns(3)                            # create three columns
+        col_idx = 0                                     # track which column to place the next widget
+        for spec in inputs_spec:                        # iterate over declared inputs
+            name = spec.get("name", "").strip()         # read input name
+            itype = (spec.get("type") or "text").lower()  # read input type, default text
+            required = bool(spec.get("required", False))  # read required flag
+            default = spec.get("default", "")           # read default value
+            choices = spec.get("choices")               # read categorical choices if present
 
-# ============================================================================
-# Process Prediction
-# ============================================================================
-
-if submitted:
-    
-    with st.spinner("Calculating risk..."):
-        
-        # Prepare order data
-        order_data = {
-            'num_items': num_items,
-            'num_sellers': num_sellers,
-            'num_products': num_items,
-            'total_order_value': total_order_value,
-            'avg_item_price': total_order_value / num_items,
-            'max_item_price': total_order_value / num_items,
-            'total_shipping_cost': total_shipping_cost,
-            'avg_shipping_cost': total_shipping_cost / num_items,
-            'total_weight_g': total_weight_g,
-            'avg_weight_g': total_weight_g / num_items,
-            'max_weight_g': total_weight_g / num_items,
-            'avg_length_cm': avg_length_cm,
-            'avg_height_cm': avg_height_cm,
-            'avg_width_cm': avg_width_cm,
-            'avg_shipping_distance_km': avg_shipping_distance_km,
-            'max_shipping_distance_km': avg_shipping_distance_km,
-            'is_cross_state': is_cross_state,
-            'order_weekday': order_weekday,
-            'order_month': order_month,
-            'order_hour': order_hour,
-            'is_weekend_order': 1 if order_weekday >= 5 else 0,
-            'is_holiday_season': 1 if order_month in [11, 12] else 0,
-            'estimated_days': estimated_days
-        }
-        
-        # Calculate features
-        features_df = calculate_features(order_data)
-        
-        # Make prediction
-        result = predict_single(model, features_df)
-        
-        if result:
-            
-            st.markdown("---")
-            st.markdown("## 📊 Prediction Results")
-            
-            # Display risk gauge and metrics
-            col1, col2 = st.columns([2, 1])
-            
-            with col1:
-                # Risk gauge
-                fig = create_risk_gauge(result['risk_score'], result['risk_level'])
-                st.plotly_chart(fig, use_container_width=True)
-            
-            with col2:
-                st.markdown("### 📈 Key Metrics")
-                
-                st.metric(
-                    label="Prediction",
-                    value=result['prediction_label'],
-                    help="Binary prediction: Late or On-Time"
-                )
-                
-                st.metric(
-                    label="Risk Score",
-                    value=f"{result['risk_score']}/100",
-                    help="Probability-based risk score (0-100)"
-                )
-                
-                st.metric(
-                    label="Risk Level",
-                    value=result['risk_level'],
-                    help="LOW (<10), MEDIUM (10-26), HIGH (>26)"
-                )
-                
-                st.metric(
-                    label="Late Probability",
-                    value=f"{result['probability']:.1%}",
-                    help="Model confidence in late delivery"
-                )
-            
-            st.markdown("---")
-            
-            # Recommendations based on risk level
-            st.markdown("## 💡 Recommended Actions")
-            
-            if result['risk_level'] == 'HIGH':
-                st.error("""
-                **🚨 HIGH RISK - Immediate Action Required:**
-                - ⚡ Upgrade to expedited shipping immediately
-                - 📞 Proactively contact customer with realistic timeline
-                - 🏷️ Flag order for priority processing in warehouse
-                - 📦 Consider splitting order across warehouses if possible
-                - 💰 Budget for potential refund/compensation
-                - 📊 Daily monitoring until delivery confirmed
-                """)
-            
-            elif result['risk_level'] == 'MEDIUM':
-                st.warning("""
-                **⚠️ MEDIUM RISK - Monitor Closely:**
-                - 👀 Add to daily monitoring watchlist
-                - 📧 Send automated tracking updates to customer
-                - 🚚 Ensure optimal carrier selection for route
-                - 📊 Review shipping route for potential bottlenecks
-                - 💬 Prepare customer service team for potential inquiries
-                """)
-            
-            else:
-                st.success("""
-                **✅ LOW RISK - Standard Processing:**
-                - ✓ Proceed with normal shipping workflow
-                - ✓ Standard customer communication
-                - ✓ No special intervention required
-                - ✓ Monitor as part of regular batch processing
-                """)
-            
-            st.markdown("---")
-            
-            # ================================================================
-            # PDF Report Export
-            # ================================================================
-            
-            st.markdown("### 📥 Download Report")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                try:
-                    from utils.pdf_generator import generate_risk_report
-                    
-                    pdf_bytes = generate_risk_report(
-                        order_data=order_data,
-                        prediction_result=result,
-                        features_df=features_df
+            # Choose the current column for this widget
+            with cols[col_idx % 3]:                     # place widget in a rotating column
+                # Render appropriate control by type
+                if itype in {"category", "categorical", "select"} and isinstance(choices, list):
+                    form_values[name] = st.selectbox(   # create dropdown for categorical inputs
+                        label=f"{name} {'*' if required else ''}",
+                        options=choices,
+                        index=choices.index(default) if default in choices else 0
                     )
-                    
-                    st.download_button(
-                        label="📄 Download PDF Report",
-                        data=pdf_bytes,
-                        file_name=f"risk_report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-                        mime="application/pdf",
-                        use_container_width=True,
-                        type="primary"
+                elif itype in {"int", "integer"}:
+                    form_values[name] = st.number_input(  # integer numeric input
+                        label=f"{name} {'*' if required else ''}",
+                        value=int(default) if str(default).strip() != "" else 0,
+                        step=1
                     )
-                except Exception as e:
-                    st.error(f"⚠️ PDF generation error: {str(e)}")
-                    st.info("Make sure fpdf2 is installed: pip install fpdf2")
-            
-            with col2:
-                import json
-                
-                json_data = {
-                    'timestamp': pd.Timestamp.now().isoformat(),
-                    'order_data': order_data,
-                    'prediction': result,
-                    'risk_score': result['risk_score'],
-                    'risk_level': result['risk_level']
-                }
-                
-                                # Add CSS for button visibility
-                st.markdown("""
-                <style>
-                    div[data-testid="stDownloadButton"] button {
-                        background-color: #0068C9 !important;
-                        color: white !important;
-                        border: 2px solid #0068C9 !important;
-                        font-weight: 600 !important;
-                    }
-                    div[data-testid="stDownloadButton"] button:hover {
-                        background-color: #0056a3 !important;
-                        border-color: #0056a3 !important;
-                    }
-                </style>
-                """, unsafe_allow_html=True)
-                
-                st.download_button(
-                    label="📊 Download Data (JSON)",
-                    data=json.dumps(json_data, indent=2, default=str),
-                    file_name=f"prediction_data_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.json",
-                    mime="application/json",
-                    use_container_width=True
-                )
-            
-            st.markdown("---")
-            
-            # ================================================================
-            # Feature Breakdown
-            # ================================================================
-            
-            with st.expander("🔍 View Detailed Feature Breakdown"):
-                st.markdown("#### Calculated Features Used in Prediction")
-                
-                feature_descriptions = get_feature_descriptions()
-                
-                feature_display = []
-                for col in features_df.columns:
-                    feature_display.append({
-                        'Feature': feature_descriptions.get(col, col),
-                        'Technical Name': col,
-                        'Value': f"{features_df[col].values[0]:.2f}"
-                    })
-                
-                st.dataframe(
-                    pd.DataFrame(feature_display),
-                    use_container_width=True,
-                    height=400
-                )
-                
-                st.info("""
-                **Understanding Features:**
-                - These 29 features were engineered from your input
-                - They capture complexity, financial, physical, geographic, and temporal aspects
-                - The model uses all features to calculate risk probability
-                """)
+                elif itype in {"float", "double", "number", "numeric"}:
+                    form_values[name] = st.number_input(  # float numeric input
+                        label=f"{name} {'*' if required else ''}",
+                        value=float(default) if str(default).strip() != "" else 0.0,
+                        step=0.01,
+                        format="%.6f"
+                    )
+                elif itype in {"bool", "boolean"}:
+                    form_values[name] = st.checkbox(     # boolean input
+                        label=f"{name} {'*' if required else ''}",
+                        value=bool(default)
+                    )
+                elif itype in {"datetime", "date"}:
+                    # Keep as text input; let feature engineering parse exact format
+                    form_values[name] = st.text_input(   # datetime as free-text
+                        label=f"{name} (YYYY-MM-DD or ISO8601) {'*' if required else ''}",
+                        value=str(default)
+                    )
+                else:
+                    # Generic text input
+                    form_values[name] = st.text_input(   # default to text field
+                        label=f"{name} {'*' if required else ''}",
+                        value=str(default)
+                    )
 
-# ============================================================================
-# Sidebar
-# ============================================================================
+            col_idx += 1                                 # increment column index for next widget
 
-with st.sidebar:
-    st.markdown("## ℹ️ How It Works")
-    st.info("""
-    This tool uses machine learning to predict late delivery risk based on:
-    
-    - **Order complexity** (items, sellers)
-    - **Financial** (order value, shipping cost)
-    - **Physical** (weight, dimensions)
-    - **Geographic** (distance, cross-state)
-    - **Temporal** (day, time, season)
-    """)
-    
-    st.markdown("---")
-    
-    st.markdown("## 💡 Tips")
-    st.success("""
-    **For accurate predictions:**
-    - Enter realistic values
-    - Consider all fields
-    - Review recommendations
-    - Download reports for records
-    """)
-    
-    st.markdown("---")
-    
-    st.markdown("## 📊 Risk Levels")
-    st.markdown("""
-    - 🟢 **LOW** (0-30): Standard processing
-    - 🟡 **MEDIUM** (30-70): Monitor closely
-    - 🔴 **HIGH** (70-100): Immediate action
-    """)
+    else:
+        # Fallback UI when feature metadata is unavailable:
+        st.info("No `feature_metadata.json` found. Enter key/value pairs (JSON) for raw order fields.")
+        default_json = "{\n  \"payment_value\": 120.50,\n  \"customer_city\": \"sao paulo\",\n  \"order_purchase_timestamp\": \"2017-07-01T10:45:00\"\n}"
+        json_text = st.text_area(                        # text area to paste JSON
+            label="Raw input JSON",
+            value=default_json,
+            height=180
+        )
+        try:
+            form_values = json.loads(json_text)          # parse JSON if possible
+            if not isinstance(form_values, dict):        # ensure dict structure
+                st.warning("The JSON must represent a single object (key/value pairs).")  # warn user
+                form_values = {}
+        except Exception:
+            st.warning("Invalid JSON. Fix the syntax or use the default example.")       # warn about syntax
+            form_values = {}
+
+    # Submit button to run prediction
+    submitted = st.form_submit_button("Predict Risk")   # render submit button
+
+# -----------------------------------------------------------------------------
+# Inference execution upon submit
+# -----------------------------------------------------------------------------
+if submitted:                                           # if user pressed the Predict button
+    if not form_values:                                 # if the form is empty
+        st.error("No inputs were provided. Please complete the form.")  # show error
+        st.stop()                                       # halt the page
+
+    # Clean inputs before sending to model
+    cleaned_inputs = _clean_single_input(form_values)   # sanitize user inputs
+
+    # Run prediction with robust handling
+    with st.spinner("Scoring…"):                        # show spinner while scoring
+        try:
+            result = predict_single(cleaned_inputs)     # call the central single-predict function
+        except Exception as e:
+            st.error(f"Prediction failed: {e}")         # show any runtime error
+            st.stop()                                   # halt the page
+
+    # Extract results cleanly
+    score: float = float(result.get("score", 0.0))      # read probability score
+    meets: bool = bool(result.get("meets_threshold", False))  # read threshold flag
+    band: str = str(result.get("risk_band", "N/A"))     # read risk band
+
+    # Display a compact result card
+    st.success("Prediction complete.")                  # success banner
+
+    r1, r2, r3 = st.columns(3)                          # three result tiles
+    with r1:                                            # tile: predicted score
+        st.metric("Predicted Probability", f"{score:.6f}", f"{score*100:.2f}%")  # show raw + percent
+    with r2:                                            # tile: threshold comparison
+        st.metric("Meets Threshold", "Yes" if meets else "No")  # yes/no flag
+    with r3:                                            # tile: risk band
+        st.metric("Risk Band", band)                    # risk band label
+
+    # Echo the cleaned inputs for traceability
+    with st.expander("View cleaned inputs sent to the model", expanded=False):  # collapsible panel
+        st.json(cleaned_inputs)                           # show json echo
+
+    st.markdown("---")                                  # divider
+
+    # Optional interpretability section: display SHAP figures if available
+    st.subheader("Model Insights (Static Artifacts)")   # section header
+    art = _artifacts_dir()                               # artifacts directory
+    shap_paths = [
+        art / "shap_summary_lightgbm.png",               # SHAP summary image
+        art / "shap_importance_lightgbm.png",            # SHAP importance
+        art / "shap_dependence_top_feature_lightgbm.png" # SHAP dependence plot
+    ]
+    found_any = False                                    # track if any images exist
+    for p in shap_paths:                                 # iterate over images
+        if p.exists():                                   # check file existence
+            st.image(str(p), use_column_width=True)      # display image
+            found_any = True                             # mark that at least one was found
+    if not found_any:                                    # if no images are available
+        st.info("No SHAP images found in `artifacts/`. Add PNGs to visualize feature effects.")  # helpful note
