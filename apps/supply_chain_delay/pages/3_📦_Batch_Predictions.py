@@ -10,6 +10,8 @@ from __future__ import annotations                    # postpone evaluation of a
 import io                                             # in-memory bytes for file uploads/downloads
 from typing import Any, Dict, List                    # typing helpers
 from pathlib import Path                              # filesystem-safe paths
+from utils.feature_labels import get_friendly_feature_map
+
 
 import numpy as np                                    # numeric utilities for demo data
 import pandas as pd                                   # DataFrame operations
@@ -181,6 +183,8 @@ if uploaded is not None:                                          # run when use
     )
 
     # Batch PDF summary export
+    friendly_map = get_friendly_feature_map()
+
     batch_pdf = generate_batch_summary_report(scored_df=df_scored, sample_preview_rows=25)  # build batch PDF
     st.download_button(
         label="⬇️ Download Batch Summary (PDF)",                  # button label
