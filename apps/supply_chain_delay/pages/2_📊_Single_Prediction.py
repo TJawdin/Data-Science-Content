@@ -1,211 +1,177 @@
 # pages/2_📊_Single_Prediction.py
-# Purpose: User-friendly single-shipment prediction with ~10 raw inputs.
-#          We convert these into the full engineered feature vector via utils.feature_engineering.
-#
-# References:
-# - Python (latest): https://docs.python.org/3/
-# - Pandas (latest): https://pandas.pydata.org/docs/
-#
+# Purpose: User-friendly single prediction (~10 raw inputs) → FE (32 features) → model → PDF export.
 # Notes:
-# - We gather raw inputs: purchase timestamp, estimated delivery date, item totals, counts,
-#   payment type, installments, location, and top category.
-# - We rely on utils.model_loader.predict_single(), which uses calculate_features()
-#   to transform raw → engineered (32 features), then runs model.predict_proba().
-# - Thorough cleaning: coercions, trimming, safe defaults.
+# - Every line is commented for clarity and to avoid indentation mistakes.
+# - Uses utils.feature_engineering.calculate_features under the hood via model_loader.predict_single.
+# - Adds a "Download PDF" button using utils.pdf_generator.generate_single_report.
 
-from __future__ import annotations  # enable postponed annotations for clarity
-from datetime import datetime, time, date  # datetime utilities for clean UI inputs
-from typing import Any, Dict               # typing helpers
-from pathlib import Path                   # filesystem paths when needed
+from __future__ import annotations  # postpone evaluation of annotations for type hints
+from datetime import date, time     # import date/time widgets for Streamlit inputs
+from typing import Any, Dict        # typing helpers for dictionaries
 
-import pandas as pd                        # light cleaning / types
-import streamlit as st                     # Streamlit UI
+import pandas as pd                 # DataFrame handling for engineered features echo
+import streamlit as st              # Streamlit UI elements
 
-# Central app helpers (metadata + inference)
-from utils.model_loader import load_metadata, predict_single  # load metadata and score one example
+# App utilities: metadata + prediction functions
+from utils.model_loader import load_metadata, predict_single  # load model metadata and single prediction
+# Feature engineering: to echo the engineered feature vector in the PDF report
+from utils.feature_engineering import calculate_features      # transform raw → engineered (32 features)
+# PDF generator: to export a single-order PDF summary
+from utils.pdf_generator import generate_single_report        # build a PDF in memory for download
 
 
-# ----------------------------- Small helpers ----------------------------- #
+# ----------------------------- Helpers ----------------------------- #
 
 def _to_iso_dt(d: date, t: time) -> str:
-    """Combine separate date and time widgets into ISO-like string."""
-    # Return a string like "YYYY-MM-DDTHH:MM:SS" suitable for pandas.to_datetime
-    return f"{d.isoformat()}T{t.strftime('%H:%M')}:00"  # :00 seconds for stability
+    """Combine date and time into an ISO-like string."""
+    return f"{d.isoformat()}T{t.strftime('%H:%M')}:00"  # produce YYYY-MM-DDTHH:MM:SS
 
 def _clean_text(x: Any) -> str:
-    """Normalize text fields (trim spaces, lower where appropriate for categories)."""
-    # Return empty string for None; otherwise trimmed text
-    if x is None:
-        return ""
-    return str(x).strip()
+    """Trim whitespace and coerce to string."""
+    return "" if x is None else str(x).strip()  # ensure a non-None trimmed string
 
 def _clean_state(x: Any) -> str:
-    """Brazilian state codes are usually uppercase (e.g., 'SP', 'RJ')."""
-    # Uppercase the state code for consistency
-    return _clean_text(x).upper()
+    """Uppercase the Brazilian state abbreviation."""
+    return _clean_text(x).upper()  # uppercase for consistency
 
 
 # ----------------------------- Load metadata ----------------------------- #
 
-meta: Dict[str, Any] = load_metadata()                               # read artifacts/final_metadata.json
-thr: float = float(meta.get("optimal_threshold", 0.5))               # operating threshold (0–1)
-rb: Dict[str, Any] = meta.get("risk_bands", {})                      # risk bands dict
-low_max: int = int(rb.get("low_max", 30))                            # low band cutoff in percent
-med_max: int = int(rb.get("med_max", 67))                            # medium band cutoff in percent
+meta: Dict[str, Any] = load_metadata()                 # read thresholds, bands, metrics from artifacts
+thr: float = float(meta.get("optimal_threshold", 0.5)) # operating threshold (0..1)
+rb: Dict[str, Any] = meta.get("risk_bands", {})        # risk bands dict {"low_max": int, "med_max": int}
+low_max: int = int(rb.get("low_max", 30))              # low band upper bound in percent
+med_max: int = int(rb.get("med_max", 67))              # medium band upper bound in percent
 
 
 # ----------------------------- Page header ----------------------------- #
 
-st.title("📊 Single Prediction")                                      # main page title
-st.caption("Provide a few order details; we’ll do the rest under the hood.")  # subtitle
+st.set_page_config(page_title="Single Prediction — Supply Chain Delay", page_icon="📊", layout="wide")  # page config
+st.title("📊 Single Prediction")                                  # main page title
+st.caption("Provide a few order details; we’ll compute the full feature vector and predict late-risk.")  # subtitle
 
 # Quick model context tiles
-c1, c2, c3, c4 = st.columns(4)                                       # metrics row
-c1.metric("Threshold", f"{thr:.6f}", f"{thr*100:.2f}%")              # threshold shown in prob and percent
-c2.metric("AUC-ROC", f"{float(meta.get('best_model_auc', 0.0)):.4f}")# display AUC with 4 decimals
-c3.metric("Low Band (≤)", f"{low_max}%")                             # low band cutoff
-c4.metric("Medium Band (≤)", f"{med_max}%")                          # medium band cutoff
-st.markdown("---")                                                   # divider
+c1, c2, c3, c4 = st.columns(4)                                    # create four metric tiles
+c1.metric("Threshold", f"{thr:.6f}", f"{thr*100:.2f}%")           # show both probability and percent
+c2.metric("AUC-ROC", f"{float(meta.get('best_model_auc', 0.0)):.4f}")  # show AUC to four decimals
+c3.metric("Low Band (≤)", f"{low_max}%")                          # show low band cutoff
+c4.metric("Medium Band (≤)", f"{med_max}%")                       # show medium band cutoff
+st.markdown("---")                                                # visual divider
 
 
-# ----------------------------- Input form (≈10 raw fields) ----------------------------- #
-# Rationale:
-# 1) Purchase timestamp + estimated delivery date → time features + est_lead_days
-# 2) sum_price + sum_freight (or total_payment) → monetary drivers
-# 3) n_items, n_sellers → order complexity
-# 4) payment_type + max_installments → payment signals
-# 5) mode_category + customer_city + customer_state → categorical context
+# ----------------------------- Input form (~10 inputs) ----------------------------- #
 
-with st.form("single_raw_form", clear_on_submit=False):              # start a form to group inputs
-    # --- Dates & times ---
-    st.subheader("When")                                             # section label
-    dcol1, dcol2, dcol3, dcol4 = st.columns([1.2, 1.0, 1.2, 1.0])    # four columns for date/time fields
-    with dcol1:
-        purch_date = st.date_input(                                  # purchase date widget
-            "Purchase date", value=date(2017, 7, 1)                  # sensible default in Olist period
-        )
-    with dcol2:
-        purch_time = st.time_input(                                  # purchase time widget
-            "Purchase time", value=time(10, 45)                      # default morning time
-        )
-    with dcol3:
-        est_deliv_date = st.date_input(                              # estimated delivery date widget
-            "Estimated delivery date", value=date(2017, 7, 11)       # default ~10 days later
-        )
-    with dcol4:
-        est_deliv_time = st.time_input(                              # optional time; mostly unused for lead-days calc
-            "Estimated delivery time", value=time(9, 0)              # morning default
-        )
+with st.form("single_raw_form", clear_on_submit=False):           # start a form to group inputs
+    # --- When section (dates/times) ---
+    st.subheader("When")                                          # section label
+    d1, d2, d3, d4 = st.columns([1.2, 1.0, 1.2, 1.0])             # four input columns
+    with d1:
+        purch_date = st.date_input("Purchase date", value=date(2017, 7, 1))  # default Olist-era date
+    with d2:
+        purch_time = st.time_input("Purchase time", value=time(10, 45))      # default morning time
+    with d3:
+        est_date = st.date_input("Estimated delivery date", value=date(2017, 7, 11))  # default ~10 days later
+    with d4:
+        est_time = st.time_input("Estimated delivery time", value=time(9, 0))         # optional, informational
 
-    # --- Money & counts ---
-    st.subheader("What")                                             # section label
-    mcol1, mcol2, mcol3, mcol4 = st.columns(4)                       # four columns for numeric fields
-    with mcol1:
-        sum_price = st.number_input(                                  # sum of item prices (without freight)
-            "Total items price (R$)", value=120.00, step=1.0, format="%.2f"
-        )
-    with mcol2:
-        sum_freight = st.number_input(                                # total freight charge
-            "Total freight (R$)", value=25.00, step=1.0, format="%.2f"
-        )
-    with mcol3:
-        n_items = st.number_input(                                    # number of items on the order
-            "Number of items", min_value=1, value=2, step=1
-        )
-    with mcol4:
-        n_sellers = st.number_input(                                  # number of distinct sellers
-            "Number of sellers", min_value=1, value=1, step=1
-        )
+    # --- Money & counts section ---
+    st.subheader("What")                                          # section label
+    m1, m2, m3, m4 = st.columns(4)                                # four input columns
+    with m1:
+        sum_price = st.number_input("Total items price (R$)", value=120.00, step=1.0, format="%.2f")   # price sum
+    with m2:
+        sum_freight = st.number_input("Total freight (R$)", value=25.00, step=1.0, format="%.2f")      # freight sum
+    with m3:
+        n_items = st.number_input("Number of items", min_value=1, value=2, step=1)                     # item count
+    with m4:
+        n_sellers = st.number_input("Number of sellers", min_value=1, value=1, step=1)                 # seller count
 
-    # --- Payment ---
-    st.subheader("Payment")                                          # section label
-    pcol1, pcol2 = st.columns([1.5, 1])                              # two columns for payment fields
-    with pcol1:
-        payment_type = st.selectbox(                                  # payment type (maps to paytype_* one-hots)
+    # --- Payment section ---
+    st.subheader("Payment")                                       # section label
+    p1, p2 = st.columns([1.5, 1.0])                               # two input columns
+    with p1:
+        payment_type = st.selectbox(
             "Payment type",
-            options=["credit_card", "boleto", "debit_card", "voucher", "not_defined"],
-            index=0
+            options=["credit_card", "boleto", "debit_card", "voucher", "not_defined"],  # known types
+            index=0,                                                                    # default to credit_card
         )
-    with pcol2:
-        max_installments = st.number_input(                           # maximum installments on the order
-            "Max installments", min_value=1, value=1, step=1
-        )
+    with p2:
+        max_installments = st.number_input("Max installments", min_value=1, value=1, step=1)  # installments
 
-    # --- Context / Category / Location ---
-    st.subheader("Context")                                          # section label
-    ccol1, ccol2, ccol3 = st.columns([1.4, 1, 1])                    # three columns for category + location
-    with ccol1:
-        mode_category = st.selectbox(                                 # primary category (mode across items)
+    # --- Context section ---
+    st.subheader("Context")                                       # section label
+    c1, c2, c3 = st.columns([1.4, 1.2, 0.8])                      # three input columns
+    with c1:
+        mode_category = st.selectbox(
             "Main category",
             options=[
                 "bed_bath_table", "health_beauty", "sports_leisure",
                 "computers_accessories", "furniture_decor", "watches_gifts",
                 "housewares", "auto", "toys", "stationery"
             ],
-            index=0
+            index=0,                                              # default category
         )
-    with ccol2:
-        customer_city = st.text_input(                                # customer city (free text; FE will standardize)
-            "Customer city", value="sao paulo"
-        )
-    with ccol3:
-        customer_state = st.selectbox(                                # state code (uppercased)
-            "Customer state",
-            options=["SP", "RJ", "MG", "PR", "RS", "BA", "ES", "SC", "GO", "DF"],
-            index=0
-        )
+    with c2:
+        customer_city = st.text_input("Customer city", value="sao paulo")    # city input
+    with c3:
+        customer_state = st.selectbox("Customer state", options=["SP", "RJ", "MG", "PR", "RS", "BA", "ES", "SC", "GO", "DF"], index=0)  # state input
 
-    # --- Submit ---
-    submitted = st.form_submit_button("Predict Risk")                # submit button to trigger scoring
+    # --- Submit button ---
+    submitted = st.form_submit_button("Predict Risk")             # submit to trigger inference
 
 
-# ----------------------------- Inference flow ----------------------------- #
+# ----------------------------- Inference & PDF ----------------------------- #
 
-if submitted:                                                        # only run when user clicks submit
-    # Assemble raw input dict expected by feature_engineering._engineer_row()
-    raw: Dict[str, Any] = {}                                         # container for raw fields
+if submitted:                                                     # only run when submitted
+    # Build a raw input dictionary consistent with our FE layer
+    raw: Dict[str, Any] = {}                                      # initialize raw dict
+    raw["order_purchase_timestamp"] = _to_iso_dt(purch_date, purch_time)  # combine date/time for purchase
+    raw["estimated_delivery_date"] = _to_iso_dt(est_date, est_time)       # combine date/time for estimate
+    raw["sum_price"] = float(sum_price)                           # numeric sum of prices
+    raw["sum_freight"] = float(sum_freight)                       # numeric sum of freight
+    raw["total_payment"] = float(sum_price) + float(sum_freight)  # explicit total
+    raw["n_items"] = int(n_items)                                 # integer items
+    raw["n_sellers"] = int(n_sellers)                             # integer sellers
+    raw["payment_type"] = str(payment_type)                       # payment type string
+    raw["payment_installments"] = [int(max_installments)]         # list form for FE (uses max())
+    raw["mode_category"] = _clean_text(mode_category)             # clean category
+    raw["customer_city"] = _clean_text(customer_city)             # clean city
+    raw["customer_state"] = _clean_state(customer_state)          # uppercase state
 
-    # Combine separate date + time into ISO strings for robust parsing (pandas.to_datetime)
-    raw["order_purchase_timestamp"] = _to_iso_dt(purch_date, purch_time)          # e.g., "2017-07-01T10:45:00"
-    raw["estimated_delivery_date"] = _to_iso_dt(est_deliv_date, est_deliv_time)   # e.g., "2017-07-11T09:00:00"
+    # Run prediction (predict_single calls FE internally for the model input)
+    with st.spinner("Scoring…"):                                   # show spinner while computing
+        result = predict_single(raw)                               # run single prediction
 
-    # Monetary totals (model features sum_price, sum_freight, and total_payment are derived)
-    raw["sum_price"] = float(sum_price)                                           # ensure numeric
-    raw["sum_freight"] = float(sum_freight)                                       # ensure numeric
-    raw["total_payment"] = float(sum_price) + float(sum_freight)                  # explicit to avoid ambiguity
-
-    # Order counts
-    raw["n_items"] = int(n_items)                                                 # count of items
-    raw["n_sellers"] = int(n_sellers)                                             # count of sellers
-    # We let feature_engineering default n_products ~ n_items when not provided
-
-    # Payment info
-    raw["payment_type"] = str(payment_type)                                       # single payment type string
-    raw["payment_installments"] = [int(max_installments)]                         # list form (engineer uses max())
-
-    # Category and location
-    raw["mode_category"] = _clean_text(mode_category)                             # mode category (primary)
-    raw["customer_city"] = _clean_text(customer_city)                             # trim and normalize text
-    raw["customer_state"] = _clean_state(customer_state)                          # uppercase state code
-
-    # Run model prediction; model_loader.predict_single() will:
-    # 1) call calculate_features(raw) to create all 32 engineered features in correct order
-    # 2) compute predict_proba and apply threshold + risk bands
-    with st.spinner("Scoring…"):                                                  # UI spinner during compute
-        result = predict_single(raw)                                              # run inference
-
-    # Extract outputs
-    score: float = float(result.get("score", 0.0))                                # probability (0–1)
-    meets: bool = bool(result.get("meets_threshold", False))                      # threshold flag
-    band: str = str(result.get("risk_band", "N/A"))                               # "Low"/"Medium"/"High"
+    # Extract predicted probability and band info
+    score: float = float(result.get("score", result.get("probability", 0.0)))  # tolerate alternate key name
+    meets: bool = bool(result.get("meets_threshold", False))        # boolean threshold flag
+    band: str = str(result.get("risk_band", "N/A"))                 # Low/Medium/High band
 
     # Results summary tiles
-    st.success("Prediction complete.")                                            # success banner
-    r1, r2, r3 = st.columns(3)                                                    # three metric tiles
-    r1.metric("Predicted Probability", f"{score:.6f}", f"{score*100:.2f}%")       # show both scales
-    r2.metric("Meets Threshold", "Yes" if meets else "No")                         # boolean result
-    r3.metric("Risk Band", band)                                                  # band label
+    st.success("Prediction complete.")                              # success banner
+    r1, r2, r3 = st.columns(3)                                      # three metric tiles
+    r1.metric("Predicted Probability", f"{score:.6f}", f"{score*100:.2f}%")  # probability as number and percent
+    r2.metric("Meets Threshold", "Yes" if meets else "No")          # meets threshold
+    r3.metric("Risk Band", band)                                    # band label
 
-    # Echo inputs for traceability (what we sent to the FE layer)
-    with st.expander("Raw inputs sent to the model", expanded=False):             # collapsible panel
-        st.json(raw)                                                              # show the raw dict
+    # Build engineered features (1 row) to include in PDF's Top Factors fallback
+    engineered = calculate_features(pd.DataFrame([raw]))            # transform raw → engineered
+
+    # PDF generation: assemble and offer download
+    pdf_bytes = generate_single_report(                             # build the PDF in memory
+        order_raw=raw,                                              # raw inputs dictionary
+        prediction=result,                                          # model result dictionary
+        engineered_features=engineered,                             # 1-row engineered DataFrame
+        shap_contributions=None,                                    # optional dict if using SHAP later
+        friendly_feature_names=None,                                # optional mapping for business-friendly names
+    )
+    st.download_button(                                             # render a download button
+        "⬇️ Download PDF Report",                                   # button text
+        data=pdf_bytes,                                             # PDF bytes payload
+        file_name="risk_report.pdf",                                # filename for download
+        mime="application/pdf",                                     # correct MIME type
+    )
+
+    # Optional: show raw payload sent to FE for traceability
+    with st.expander("Raw inputs sent to the model", expanded=False):  # collapsible block
+        st.json(raw)                                                # pretty-print raw dictionary
