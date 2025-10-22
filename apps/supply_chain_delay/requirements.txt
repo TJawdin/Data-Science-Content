@@ -2,7 +2,6 @@
 # CORE FRAMEWORK
 # ========================
 streamlit==1.38.0           # app framework
-python-dateutil==2.9.0.post0# robust datetime parsing
 joblib==1.4.2               # model serialization
 pillow==10.3.0              # image handling for static assets
 
