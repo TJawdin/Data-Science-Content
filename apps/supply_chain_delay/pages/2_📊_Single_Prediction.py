@@ -1,165 +1,316 @@
+"""
+Single Prediction Page
+Interactive form for predicting delay risk for individual orders
+"""
+
 import streamlit as st
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
-import plotly.graph_objects as go
-import plotly.express as px
-from utils.model_loader import ModelLoader
-from utils.visualization import create_gauge_chart, create_feature_impact_chart
+from datetime import datetime
+from utils import (
+    load_model_artifacts,
+    predict_delay,
+    prepare_features,
+    calculate_temporal_features,
+    apply_custom_css,
+    show_page_header,
+    display_risk_badge,
+    plot_risk_gauge,
+    generate_prediction_report
+)
 
+# Page config
 st.set_page_config(page_title="Single Prediction", page_icon="📊", layout="wide")
+apply_custom_css()
 
-# Custom styling
-st.markdown("""
-    <style>
-    .prediction-header {
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-        padding: 20px;
-        border-radius: 10px;
-        color: white;
-        text-align: center;
-    }
-    .input-section {
-        background-color: #f7f7f7;
-        padding: 15px;
-        border-radius: 8px;
-        margin-bottom: 10px;
-    }
-    .result-card {
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    </style>
-""", unsafe_allow_html=True)
+# Load model
+model, final_metadata, feature_metadata, threshold = load_model_artifacts()
 
-st.title("📊 Single Order Delay Prediction")
-st.markdown("Enter order details to predict delivery delay risk")
+# Header
+show_page_header(
+    title="Single Order Prediction",
+    description="Enter order details to predict delivery delay risk with AI-powered insights",
+    icon="📊"
+)
 
-# Initialize model
-@st.cache_resource
-def init_model_loader():
-    return ModelLoader(artifacts_path="./artifacts")
+# Instructions
+st.info("📝 Fill in the order details below. All fields are required for accurate predictions.")
 
-model_loader = init_model_loader()
-model = model_loader.load_model()
-metadata, feature_metadata = model_loader.load_metadata()
+# Create tabs for input organization
+tab1, tab2, tab3, tab4 = st.tabs(["📦 Order Details", "💰 Financial", "🗺️ Geographic", "⏰ Temporal"])
 
-# Create input form with tabs
-tab1, tab2, tab3, tab4 = st.tabs(["📦 Order Info", "💳 Payment", "📏 Product Details", "🚚 Logistics"])
+# Initialize session state for form data
+if 'form_data' not in st.session_state:
+    st.session_state.form_data = {}
 
+# Tab 1: Order Details
 with tab1:
+    st.markdown("### Order Characteristics")
+    
     col1, col2 = st.columns(2)
+    
     with col1:
-        n_items = st.number_input("Number of Items", min_value=1, max_value=50, value=2, 
-                                 help="Total quantity of items in the order")
-        n_products = st.number_input("Number of Different Products", min_value=1, max_value=20, value=1,
-                                    help="How many unique products")
-        n_sellers = st.number_input("Number of Sellers", min_value=1, max_value=10, value=1,
-                                   help="Number of different sellers involved")
+        n_items = st.number_input(
+            "Number of Items",
+            min_value=1,
+            max_value=50,
+            value=2,
+            help="Total number of items in the order"
+        )
+        
+        n_sellers = st.number_input(
+            "Number of Sellers",
+            min_value=1,
+            max_value=20,
+            value=1,
+            help="Number of different sellers in this order"
+        )
+        
+        n_products = st.number_input(
+            "Number of Unique Products",
+            min_value=1,
+            max_value=50,
+            value=2,
+            help="Number of distinct products"
+        )
+        
+        n_categories = st.number_input(
+            "Number of Categories",
+            min_value=1,
+            max_value=20,
+            value=1,
+            help="Number of different product categories"
+        )
+        
+        mode_category_count = st.number_input(
+            "Most Common Category Count",
+            min_value=1,
+            max_value=50,
+            value=2,
+            help="Count of items in the most frequent category"
+        )
+    
     with col2:
-        n_categories = st.number_input("Number of Categories", min_value=1, max_value=10, value=1,
-                                      help="Product category diversity")
-        mode_category = st.selectbox("Main Product Category", 
-                                    ["beleza_saude", "informatica_acessorios", "esporte_lazer",
-                                     "cama_mesa_banho", "moveis_decoracao", "utilidades_domesticas",
-                                     "relogios_presentes", "telefonia", "ferramentas_jardim",
-                                     "automotivo", "brinquedos", "cool_stuff", "perfumaria",
-                                     "bebes", "eletronicos", "papelaria", "fashion_bolsas_e_acessorios",
-                                     "pet_shop", "outros"],
-                                    help="Primary category of products")
-        mode_category_count = st.number_input("Items in Main Category", min_value=1, max_value=20, 
-                                             value=min(n_items, 1))
+        mode_category = st.selectbox(
+            "Primary Product Category",
+            options=[
+                'electronics', 'furniture_decor', 'health_beauty',
+                'sports_leisure', 'computers_accessories', 'housewares',
+                'watches_gifts', 'bed_bath_table', 'toys', 'auto',
+                'telephony', 'books_general_interest', 'cool_stuff',
+                'home_appliances', 'garden_tools', 'baby', 'fashion_shoes',
+                'perfumery', 'stationery', 'fashion_bags_accessories'
+            ],
+            help="Primary category of products in the order"
+        )
+        
+        st.markdown("### Product Dimensions (Averages)")
+        
+        avg_weight_g = st.number_input(
+            "Average Weight (grams)",
+            min_value=1.0,
+            max_value=50000.0,
+            value=2000.0,
+            step=100.0
+        )
+        
+        avg_length_cm = st.number_input(
+            "Average Length (cm)",
+            min_value=1.0,
+            max_value=200.0,
+            value=30.0,
+            step=1.0
+        )
+        
+        avg_height_cm = st.number_input(
+            "Average Height (cm)",
+            min_value=1.0,
+            max_value=200.0,
+            value=15.0,
+            step=1.0
+        )
+        
+        avg_width_cm = st.number_input(
+            "Average Width (cm)",
+            min_value=1.0,
+            max_value=200.0,
+            value=20.0,
+            step=1.0
+        )
 
+# Tab 2: Financial
 with tab2:
+    st.markdown("### Financial Information")
+    
     col1, col2 = st.columns(2)
+    
     with col1:
-        sum_price = st.number_input("Product Total (R$)", min_value=0.0, max_value=50000.0, 
-                                   value=150.0, step=10.0,
-                                   help="Total price of products (excluding freight)")
-        sum_freight = st.number_input("Freight Cost (R$)", min_value=0.0, max_value=1000.0, 
-                                     value=20.0, step=5.0,
-                                     help="Shipping cost")
-        total_payment = sum_price + sum_freight
-        st.metric("Total Order Value", f"R$ {total_payment:.2f}")
+        sum_price = st.number_input(
+            "Total Price (R$)",
+            min_value=0.01,
+            max_value=100000.0,
+            value=150.0,
+            step=10.0,
+            help="Sum of all item prices"
+        )
+        
+        sum_freight = st.number_input(
+            "Total Freight Cost (R$)",
+            min_value=0.0,
+            max_value=5000.0,
+            value=25.0,
+            step=5.0,
+            help="Total shipping/freight cost"
+        )
+        
+        total_payment = st.number_input(
+            "Total Payment (R$)",
+            min_value=0.01,
+            max_value=100000.0,
+            value=sum_price + sum_freight,
+            step=10.0,
+            help="Total amount paid (usually price + freight)"
+        )
     
     with col2:
-        payment_type = st.selectbox("Payment Method", 
-                                   ["credit_card", "boleto", "debit_card", "voucher", "not_defined"],
-                                   help="Payment method used")
-        max_installments = st.slider("Installments", min_value=0, max_value=24, value=1,
-                                    help="Number of payment installments (0 for single payment)")
-        n_payment_records = 1 if max_installments == 0 else max_installments
+        n_payment_records = st.number_input(
+            "Number of Payment Transactions",
+            min_value=1,
+            max_value=10,
+            value=1,
+            help="Number of separate payment records"
+        )
+        
+        max_installments = st.number_input(
+            "Maximum Installments",
+            min_value=1,
+            max_value=24,
+            value=3,
+            help="Maximum number of payment installments"
+        )
+        
+        st.markdown("### Payment Type")
+        payment_type = st.selectbox(
+            "Select Payment Method",
+            options=['credit_card', 'debit_card', 'boleto', 'voucher', 'not_defined'],
+            format_func=lambda x: x.replace('_', ' ').title()
+        )
 
+# Tab 3: Geographic
 with tab3:
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("#### Average Product Dimensions")
-        avg_weight_g = st.number_input("Weight (grams)", min_value=0.0, max_value=100000.0, 
-                                      value=500.0, step=100.0)
-        avg_length_cm = st.number_input("Length (cm)", min_value=0.0, max_value=200.0, 
-                                       value=20.0, step=1.0)
-    with col2:
-        st.markdown("#### ")  # Empty header for alignment
-        avg_height_cm = st.number_input("Height (cm)", min_value=0.0, max_value=200.0, 
-                                       value=10.0, step=1.0)
-        avg_width_cm = st.number_input("Width (cm)", min_value=0.0, max_value=200.0, 
-                                      value=15.0, step=1.0)
+    st.markdown("### Geographic Information")
     
-    # Volume calculation
-    volume = (avg_length_cm * avg_height_cm * avg_width_cm) / 1000  # in liters
-    st.info(f"📦 Package Volume: {volume:.1f} liters | Weight: {avg_weight_g/1000:.2f} kg")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### Customer Location")
+        
+        customer_state = st.selectbox(
+            "Customer State",
+            options=[
+                'SP', 'RJ', 'MG', 'RS', 'PR', 'SC', 'BA', 'DF', 'ES', 'GO',
+                'PE', 'CE', 'PA', 'MT', 'MA', 'MS', 'PB', 'RN', 'AL', 'PI',
+                'SE', 'RO', 'TO', 'AC', 'AM', 'AP', 'RR'
+            ],
+            help="Brazilian state code (e.g., SP for São Paulo)"
+        )
+        
+        # Common cities by state
+        city_options = {
+            'SP': ['sao paulo', 'campinas', 'santos', 'sorocaba', 'ribeirao preto'],
+            'RJ': ['rio de janeiro', 'niteroi', 'duque de caxias', 'nova iguacu'],
+            'MG': ['belo horizonte', 'uberlandia', 'contagem', 'juiz de fora'],
+            'default': ['capital city', 'major city', 'other']
+        }
+        
+        customer_city = st.selectbox(
+            "Customer City",
+            options=city_options.get(customer_state, city_options['default'])
+        )
+    
+    with col2:
+        st.markdown("#### Seller Information")
+        
+        seller_state_mode = st.selectbox(
+            "Primary Seller State",
+            options=[
+                'SP', 'RJ', 'MG', 'RS', 'PR', 'SC', 'BA', 'DF', 'ES', 'GO',
+                'PE', 'CE', 'PA', 'MT', 'MA', 'MS', 'PB', 'RN', 'AL', 'PI',
+                'SE', 'RO', 'TO', 'AC', 'AM', 'AP', 'RR'
+            ],
+            help="State where most sellers are located"
+        )
+        
+        n_seller_states = st.number_input(
+            "Number of Seller States",
+            min_value=1,
+            max_value=10,
+            value=1,
+            help="Number of different states sellers are from"
+        )
 
+# Tab 4: Temporal
 with tab4:
+    st.markdown("### Temporal Information")
+    
     col1, col2 = st.columns(2)
+    
     with col1:
-        st.markdown("#### Delivery Location")
-        customer_state = st.selectbox("Customer State", 
-                                     ["SP", "RJ", "MG", "RS", "PR", "SC", "BA", "DF", "ES", "GO", 
-                                      "PE", "CE", "PA", "MT", "MS", "MA", "RN", "PB", "AL", "PI", 
-                                      "SE", "RO", "TO", "AC", "AM", "RR", "AP"])
-        customer_city = st.text_input("Customer City", value="sao paulo",
-                                     help="City name (lowercase)")
+        purchase_date = st.date_input(
+            "Purchase Date",
+            value=datetime.now(),
+            help="Date when the order was placed"
+        )
         
-        st.markdown("#### Seller Location")
-        seller_state_mode = st.selectbox("Primary Seller State", 
-                                        ["SP", "RJ", "MG", "RS", "PR", "SC", "BA", "DF", "ES", "GO"])
-        n_seller_states = st.number_input("Number of Seller States", min_value=1, max_value=10, 
-                                         value=1, help="Geographic distribution of sellers")
+        purchase_time = st.time_input(
+            "Purchase Time",
+            value=datetime.now().time(),
+            help="Time when the order was placed"
+        )
+        
+        # Combine date and time
+        purchase_datetime = datetime.combine(purchase_date, purchase_time)
+        
+        # Calculate temporal features
+        temporal_features = calculate_temporal_features(purchase_datetime)
     
     with col2:
-        st.markdown("#### Order Timing")
-        order_datetime = st.datetime_input("Order Date & Time", value=datetime.now())
-        purch_year = order_datetime.year
-        purch_month = order_datetime.month
-        purch_dayofweek = order_datetime.weekday()
-        purch_hour = order_datetime.hour
-        purch_is_weekend = 1 if purch_dayofweek >= 5 else 0
+        est_lead_days = st.slider(
+            "Estimated Lead Time (days)",
+            min_value=1.0,
+            max_value=30.0,
+            value=7.0,
+            step=0.5,
+            help="Expected delivery lead time in days"
+        )
         
-        # Display timing info
-        day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        st.info(f"📅 {day_names[purch_dayofweek]} | {'Weekend' if purch_is_weekend else 'Weekday'} | {purch_hour:02d}:00")
-        
-        est_lead_days = st.number_input("Estimated Lead Time (days)", min_value=1, max_value=60, 
-                                       value=10, help="Expected delivery time in days")
-        
-        # Calculate expected delivery date
-        expected_delivery = order_datetime + timedelta(days=est_lead_days)
-        st.info(f"📅 Expected Delivery: {expected_delivery.strftime('%Y-%m-%d')}")
+        st.markdown("### Calculated Temporal Features")
+        st.write(f"**Year**: {temporal_features['purch_year']}")
+        st.write(f"**Month**: {temporal_features['purch_month']}")
+        st.write(f"**Day of Week**: {temporal_features['purch_dayofweek']} (0=Mon)")
+        st.write(f"**Hour**: {temporal_features['purch_hour']}")
+        st.write(f"**Is Weekend**: {'Yes' if temporal_features['purch_is_weekend'] else 'No'}")
 
-# Predict button
 st.markdown("---")
+
+# Prediction button
 col1, col2, col3 = st.columns([1, 2, 1])
-
 with col2:
-    predict_button = st.button("🔮 Predict Delivery Risk", type="primary", use_container_width=True)
+    predict_button = st.button("🔮 Predict Delay Risk", use_container_width=True, type="primary")
 
+# Make prediction when button is clicked
 if predict_button:
-    # Prepare features
-    purch_hour_sin = np.sin(2 * np.pi * purch_hour / 24)
-    purch_hour_cos = np.cos(2 * np.pi * purch_hour / 24)
+    # Create payment type one-hot encoding
+    payment_features = {
+        'paytype_boleto': 1 if payment_type == 'boleto' else 0,
+        'paytype_credit_card': 1 if payment_type == 'credit_card' else 0,
+        'paytype_debit_card': 1 if payment_type == 'debit_card' else 0,
+        'paytype_not_defined': 1 if payment_type == 'not_defined' else 0,
+        'paytype_voucher': 1 if payment_type == 'voucher' else 0
+    }
     
-    features = {
+    # Compile all features
+    order_data = {
         'n_items': n_items,
         'n_sellers': n_sellers,
         'n_products': n_products,
@@ -173,188 +324,111 @@ if predict_button:
         'avg_height_cm': avg_height_cm,
         'avg_width_cm': avg_width_cm,
         'n_seller_states': n_seller_states,
-        'purch_year': purch_year,
-        'purch_month': purch_month,
-        'purch_dayofweek': purch_dayofweek,
-        'purch_hour': purch_hour,
-        'purch_is_weekend': purch_is_weekend,
-        'purch_hour_sin': purch_hour_sin,
-        'purch_hour_cos': purch_hour_cos,
         'est_lead_days': est_lead_days,
         'n_categories': n_categories,
         'mode_category_count': mode_category_count,
-        'paytype_boleto': 1 if payment_type == 'boleto' else 0,
-        'paytype_credit_card': 1 if payment_type == 'credit_card' else 0,
-        'paytype_debit_card': 1 if payment_type == 'debit_card' else 0,
-        'paytype_not_defined': 1 if payment_type == 'not_defined' else 0,
-        'paytype_voucher': 1 if payment_type == 'voucher' else 0,
         'mode_category': mode_category,
         'seller_state_mode': seller_state_mode,
-        'customer_city': customer_city.lower(),
-        'customer_state': customer_state
+        'customer_city': customer_city,
+        'customer_state': customer_state,
+        **temporal_features,
+        **payment_features
     }
     
-    # Create DataFrame and ensure correct column order
-    features_df = pd.DataFrame([features])
-    features_df = features_df[feature_metadata['feature_names']]
-    
-    # Get predictions
-    with st.spinner("Analyzing order risk..."):
-        predictions, probabilities, risk_levels = model_loader.predict_with_probability(features_df)
-    
-    prediction = predictions[0]
-    probability = probabilities[0]
-    risk_level = risk_levels[0]
-    
-    # Results section
-    st.markdown("---")
-    st.markdown("## 🎯 Prediction Results")
-    
-    # Main result display
-    result_col1, result_col2, result_col3 = st.columns([2, 1, 1])
-    
-    with result_col1:
-        if prediction == 1:
-            st.error("### ⚠️ HIGH RISK OF DELAY")
-            st.markdown(f"**Delay Probability:** {probability*100:.1f}%")
-            st.markdown(f"**Risk Level:** {risk_level}")
+    # Prepare features and make prediction
+    try:
+        features_df = prepare_features(order_data, feature_metadata['feature_names'])
+        predictions, probabilities, risk_levels = predict_delay(model, features_df, threshold)
+        
+        prediction = predictions[0]
+        probability = probabilities[0]
+        risk_level = risk_levels[0]
+        
+        st.markdown("---")
+        st.markdown("## 🎯 Prediction Results")
+        
+        # Display results
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            display_risk_badge(risk_level, probability)
             
-            # Calculate days at risk
-            risk_days = int(est_lead_days * 0.3)  # Assume 30% delay
-            new_delivery = expected_delivery + timedelta(days=risk_days)
-            st.warning(f"⏰ Potential delivery by: {new_delivery.strftime('%Y-%m-%d')} (+{risk_days} days)")
+            st.markdown("### Key Metrics")
+            st.metric("Delay Probability", f"{probability*100:.1f}%")
+            st.metric("Classification", "Delayed" if prediction == 1 else "On Time")
+            st.metric("Risk Level", risk_level)
+            st.metric("Threshold", f"{threshold*100:.1f}%")
+        
+        with col2:
+            fig_gauge = plot_risk_gauge(probability, threshold)
+            st.plotly_chart(fig_gauge, use_container_width=True)
+        
+        st.markdown("---")
+        
+        # Recommendations
+        st.markdown("### 💡 Recommendations")
+        
+        if risk_level == 'High':
+            st.error("🚨 **High Risk - Immediate Action Required**")
+            st.markdown("""
+            **Priority Actions:**
+            1. 🚀 Consider expedited shipping
+            2. 📞 Proactive customer communication
+            3. 🔍 Verify seller capacity and inventory
+            4. 📊 Enhanced monitoring throughout fulfillment
+            5. 💼 Evaluate order optimization opportunities
+            """)
+        elif risk_level == 'Medium':
+            st.warning("⚠️ **Medium Risk - Enhanced Monitoring**")
+            st.markdown("""
+            **Recommended Actions:**
+            1. 👀 Increase monitoring frequency
+            2. ✅ Verify inventory and logistics
+            3. 📱 Set realistic customer expectations
+            4. 🚛 Confirm shipping capabilities
+            """)
         else:
-            st.success("### ✅ LOW RISK OF DELAY")
-            st.markdown(f"**Delay Probability:** {probability*100:.1f}%")
-            st.markdown(f"**Risk Level:** {risk_level}")
-            st.info(f"📅 Expected on-time delivery: {expected_delivery.strftime('%Y-%m-%d')}")
-    
-    with result_col2:
-        fig = create_gauge_chart(probability * 100, metadata['optimal_threshold'] * 100)
-        st.plotly_chart(fig, use_container_width=True)
-    
-    with result_col3:
-        # Confidence meter
-        confidence = abs(probability - 0.5) * 200  # Convert to confidence percentage
-        st.metric("Model Confidence", f"{confidence:.1f}%")
+            st.success("✅ **Low Risk - Standard Process**")
+            st.markdown("""
+            **Standard Actions:**
+            1. ✨ Proceed with normal fulfillment
+            2. 📊 Routine monitoring
+            3. 💚 Order well-positioned for on-time delivery
+            """)
         
-        # Risk factors count
-        risk_factors = 0
-        if n_seller_states > 2: risk_factors += 1
-        if avg_weight_g > 5000: risk_factors += 1
-        if est_lead_days > 15: risk_factors += 1
-        if purch_is_weekend: risk_factors += 1
-        if payment_type == 'boleto': risk_factors += 1
+        st.markdown("---")
         
-        st.metric("Risk Factors", f"{risk_factors}/5")
-    
-    # Detailed Analysis
-    with st.expander("📊 Detailed Risk Analysis", expanded=True):
+        # Generate PDF report
+        st.markdown("### 📄 Generate Report")
         
-        analysis_col1, analysis_col2 = st.columns(2)
-        
-        with analysis_col1:
-            st.markdown("#### 🚨 Risk Factors")
-            
-            risk_analysis = []
-            
-            # Geographic risk
-            if customer_state in ['AC', 'RR', 'AP', 'AM', 'RO']:
-                risk_analysis.append(("🌍 Remote delivery location", "High"))
-            elif n_seller_states > 2:
-                risk_analysis.append(("📍 Multiple seller locations", "Medium"))
-            
-            # Product complexity
-            if avg_weight_g > 10000:
-                risk_analysis.append(("⚖️ Very heavy package", "High"))
-            elif avg_weight_g > 5000:
-                risk_analysis.append(("📦 Heavy package", "Medium"))
-            
-            # Timing risk
-            if purch_is_weekend:
-                risk_analysis.append(("📅 Weekend order", "Medium"))
-            if purch_month in [11, 12]:
-                risk_analysis.append(("🎄 Holiday season", "High"))
-            
-            # Payment risk
-            if payment_type == 'boleto':
-                risk_analysis.append(("💳 Boleto payment processing", "Medium"))
-            
-            # Lead time risk
-            if est_lead_days > 20:
-                risk_analysis.append(("⏰ Long estimated lead time", "High"))
-            
-            if risk_analysis:
-                for factor, severity in risk_analysis:
-                    if severity == "High":
-                        st.markdown(f"🔴 {factor}")
-                    else:
-                        st.markdown(f"🟡 {factor}")
-            else:
-                st.success("✅ No significant risk factors identified")
-        
-        with analysis_col2:
-            st.markdown("#### 💡 Recommendations")
-            
-            if prediction == 1:
-                st.info("""
-                **Mitigation Strategies:**
-                - 🚀 Consider express shipping upgrade
-                - 📞 Set up proactive customer communication
-                - 📦 Prioritize order processing
-                - 🔍 Enable real-time tracking
-                - 📧 Send delay risk notification
-                """)
-            else:
-                st.success("""
-                **Standard Processing:**
-                - ✅ Process with normal priority
-                - 📧 Send standard confirmation
-                - 🚚 Regular shipping method suitable
-                """)
-    
-    # Feature importance for this prediction
-    with st.expander("🔍 Feature Impact Analysis", expanded=False):
-        importance_df = model_loader.get_feature_importance()
-        
-        if importance_df is not None:
-            # Get top 10 features
-            top_features = importance_df.head(10)
-            
-            # Create feature values for comparison
-            feature_values = []
-            for feat in top_features['feature']:
-                if feat in features:
-                    feature_values.append(features[feat])
-                else:
-                    feature_values.append(0)
-            
-            # Bar chart of importance
-            fig = px.bar(top_features, x='importance', y='feature', 
-                        orientation='h',
-                        title="Top 10 Most Important Features",
-                        labels={'importance': 'Feature Importance', 'feature': 'Feature'})
-            fig.update_layout(height=400)
-            st.plotly_chart(fig, use_container_width=True)
-    
-    # Save prediction option
-    with st.expander("💾 Save Prediction", expanded=False):
-        prediction_data = {
-            'timestamp': datetime.now().isoformat(),
-            'prediction': 'Delayed' if prediction == 1 else 'On Time',
-            'probability': probability,
+        report_data = {
             'risk_level': risk_level,
-            **features
+            'probability': probability,
+            'prediction': prediction,
+            'order_details': order_data
         }
         
-        st.json(prediction_data)
+        if st.button("📥 Download PDF Report"):
+            try:
+                pdf_buffer = generate_prediction_report(report_data)
+                st.download_button(
+                    label="💾 Download Report",
+                    data=pdf_buffer,
+                    file_name=f"delay_prediction_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                    mime="application/pdf"
+                )
+                st.success("✅ Report generated successfully!")
+            except Exception as e:
+                st.error(f"Error generating report: {str(e)}")
         
-        # Download button
-        df_download = pd.DataFrame([prediction_data])
-        csv = df_download.to_csv(index=False)
-        st.download_button(
-            label="📥 Download Prediction Report",
-            data=csv,
-            file_name=f"prediction_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime='text/csv'
-        )
+    except Exception as e:
+        st.error(f"❌ Prediction error: {str(e)}")
+        st.info("Please check that all fields are filled correctly and try again.")
+
+# Footer
+st.markdown("---")
+st.markdown("""
+<div style="text-align: center; color: gray;">
+    <p>💡 Tip: All fields must be filled for accurate predictions. Use realistic values based on your actual orders.</p>
+</div>
+""", unsafe_allow_html=True)
