@@ -1,6 +1,5 @@
 """
-Visualization Module
-Creates all charts and plots for the application
+Visualization utilities for supply chain delay predictions
 """
 
 import plotly.graph_objects as go
@@ -8,393 +7,371 @@ import plotly.express as px
 import pandas as pd
 import numpy as np
 import streamlit as st
-from .theme_adaptive import get_risk_color, format_probability
 
 
-def plot_risk_gauge(probability, threshold):
+def plot_risk_gauge(probability_pct, risk_category):
     """
-    Create an animated risk gauge chart
+    Create gauge chart showing risk probability
     
     Args:
-        probability: Delay probability (0-1)
-        threshold: Classification threshold
+        probability_pct: Probability as percentage (0-100)
+        risk_category: Risk category ('Low', 'Medium', 'High')
     
     Returns:
         plotly figure
     """
-    prob_pct = probability * 100
-    
-    # Determine risk level and color
-    if prob_pct <= 30:
-        risk_level = "Low"
-        color = "#28a745"
-    elif prob_pct <= 67:
-        risk_level = "Medium"
-        color = "#ffc107"
-    else:
-        risk_level = "High"
-        color = "#dc3545"
+    # Color based on risk
+    color_map = {
+        "Low": "#00CC96",
+        "Medium": "#FFA500", 
+        "High": "#EF553B"
+    }
+    color = color_map.get(risk_category, "#888888")
     
     fig = go.Figure(go.Indicator(
-        mode="gauge+number+delta",
-        value=prob_pct,
+        mode="gauge+number",
+        value=probability_pct,
         domain={'x': [0, 1], 'y': [0, 1]},
-        title={'text': f"Delay Risk: {risk_level}", 'font': {'size': 24}},
-        delta={'reference': threshold * 100, 'suffix': '%'},
-        number={'suffix': '%', 'font': {'size': 48}},
+        title={'text': "Delay Risk Probability", 'font': {'size': 20}},
+        number={'suffix': "%", 'font': {'size': 50}},
         gauge={
-            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "darkgray"},
-            'bar': {'color': color, 'thickness': 0.75},
+            'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "darkgray"},
+            'bar': {'color': color},
             'bgcolor': "white",
             'borderwidth': 2,
             'bordercolor': "gray",
             'steps': [
-                {'range': [0, 30], 'color': '#d4edda'},
-                {'range': [30, 67], 'color': '#fff3cd'},
-                {'range': [67, 100], 'color': '#f8d7da'}
+                {'range': [0, 30], 'color': '#E8F8F5'},
+                {'range': [30, 67], 'color': '#FFF4E6'},
+                {'range': [67, 100], 'color': '#FADBD8'}
             ],
             'threshold': {
                 'line': {'color': "red", 'width': 4},
                 'thickness': 0.75,
-                'value': threshold * 100
+                'value': 67
             }
         }
     ))
     
     fig.update_layout(
-        height=400,
-        margin=dict(l=20, r=20, t=60, b=20),
-        font={'size': 14}
+        height=300,
+        margin=dict(l=20, r=20, t=50, b=20),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
     )
     
     return fig
 
 
-def plot_feature_importance(feature_names, feature_values, top_n=10):
+def plot_feature_importance(feature_names, importance_values, top_n=10):
     """
     Create horizontal bar chart of feature importance
     
     Args:
         feature_names: List of feature names
-        feature_values: List of importance values
-        top_n: Number of top features to show
+        importance_values: List of importance values
+        top_n: Number of top features to display
     
     Returns:
         plotly figure
     """
-    # Create DataFrame and sort
-    df = pd.DataFrame({
-        'Feature': feature_names,
-        'Importance': feature_values
-    })
-    df = df.nlargest(top_n, 'Importance')
-    df = df.sort_values('Importance', ascending=True)
+    # Sort and get top N
+    sorted_idx = np.argsort(importance_values)[-top_n:]
+    top_features = [feature_names[i] for i in sorted_idx]
+    top_importance = [importance_values[i] for i in sorted_idx]
     
-    # Create plot
     fig = go.Figure(go.Bar(
-        x=df['Importance'],
-        y=df['Feature'],
+        x=top_importance,
+        y=top_features,
         orientation='h',
         marker=dict(
-            color=df['Importance'],
-            colorscale='Reds',
+            color=top_importance,
+            colorscale='Blues',
             showscale=False
         ),
-        text=df['Importance'].round(3),
-        textposition='outside',
-        hovertemplate='<b>%{y}</b><br>Importance: %{x:.4f}<extra></extra>'
+        text=[f'{v:.3f}' for v in top_importance],
+        textposition='outside'
     ))
     
     fig.update_layout(
-        title=f"Top {top_n} Most Important Features",
-        xaxis_title="Importance Score",
-        yaxis_title="",
-        height=max(400, top_n * 40),
-        margin=dict(l=20, r=20, t=60, b=40),
-        showlegend=False,
-        hovermode='closest'
+        title=f'Top {top_n} Most Important Features',
+        xaxis_title='Importance',
+        yaxis_title='',
+        height=400,
+        margin=dict(l=150, r=50, t=50, b=50),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
     )
     
     return fig
 
 
-def plot_shap_waterfall(shap_values, feature_names, feature_values, base_value, max_display=10):
+def plot_probability_distribution(probabilities, threshold):
     """
-    Create SHAP waterfall plot showing feature contributions
-    
-    Args:
-        shap_values: SHAP values array
-        feature_names: Feature names
-        feature_values: Feature values
-        base_value: Model's base prediction value
-        max_display: Maximum features to display
-    
-    Returns:
-        plotly figure
-    """
-    # Get top features by absolute SHAP value
-    abs_shap = np.abs(shap_values)
-    top_indices = np.argsort(abs_shap)[-max_display:][::-1]
-    
-    # Prepare data
-    names = [feature_names[i] for i in top_indices]
-    values = [shap_values[i] for i in top_indices]
-    feat_vals = [feature_values[i] for i in top_indices]
-    
-    # Calculate cumulative values for waterfall
-    cumulative = [base_value]
-    for val in values:
-        cumulative.append(cumulative[-1] + val)
-    
-    # Create colors
-    colors = ['red' if v < 0 else 'green' for v in values]
-    
-    # Create plot
-    fig = go.Figure()
-    
-    # Add base value
-    fig.add_trace(go.Bar(
-        x=[base_value],
-        y=['Base Value'],
-        orientation='h',
-        marker=dict(color='lightgray'),
-        text=[f'{base_value:.3f}'],
-        textposition='outside',
-        name='Base Value',
-        hovertemplate='Base Value: %{x:.4f}<extra></extra>'
-    ))
-    
-    # Add feature contributions
-    for i, (name, val, feat_val, color) in enumerate(zip(names, values, feat_vals, colors)):
-        fig.add_trace(go.Bar(
-            x=[val],
-            y=[f'{name}<br>= {feat_val:.2f}'],
-            orientation='h',
-            marker=dict(color=color),
-            text=[f'{val:+.3f}'],
-            textposition='outside',
-            name=name,
-            hovertemplate=f'<b>{name}</b><br>Value: {feat_val:.2f}<br>SHAP: {val:+.4f}<extra></extra>'
-        ))
-    
-    # Add final prediction
-    final_pred = cumulative[-1]
-    fig.add_trace(go.Bar(
-        x=[final_pred],
-        y=['Final Prediction'],
-        orientation='h',
-        marker=dict(color='darkblue'),
-        text=[f'{final_pred:.3f}'],
-        textposition='outside',
-        name='Final Prediction',
-        hovertemplate='Final Prediction: %{x:.4f}<extra></extra>'
-    ))
-    
-    fig.update_layout(
-        title="SHAP Waterfall: Feature Contributions to Prediction",
-        xaxis_title="SHAP Value",
-        yaxis_title="",
-        height=max(500, (max_display + 2) * 40),
-        showlegend=False,
-        barmode='overlay',
-        margin=dict(l=20, r=100, t=60, b=40)
-    )
-    
-    return fig
-
-
-def plot_probability_distribution(probabilities, threshold, bins=50):
-    """
-    Plot distribution of delay probabilities
+    Create histogram of probability distribution with threshold line
     
     Args:
         probabilities: Array of probabilities
         threshold: Classification threshold
-        bins: Number of histogram bins
     
     Returns:
         plotly figure
     """
     fig = go.Figure()
     
-    # Add histogram
     fig.add_trace(go.Histogram(
         x=probabilities * 100,
-        nbinsx=bins,
-        name='Probability Distribution',
-        marker=dict(
-            color='lightblue',
-            line=dict(color='darkblue', width=1)
-        ),
-        hovertemplate='Probability: %{x:.1f}%<br>Count: %{y}<extra></extra>'
+        nbinsx=50,
+        name='Distribution',
+        marker_color='steelblue',
+        opacity=0.7
     ))
     
-    # Add threshold line
     fig.add_vline(
         x=threshold * 100,
         line_dash="dash",
         line_color="red",
         annotation_text=f"Threshold: {threshold*100:.1f}%",
-        annotation_position="top right"
+        annotation_position="top"
     )
     
     fig.update_layout(
-        title="Distribution of Delay Probabilities",
-        xaxis_title="Delay Probability (%)",
-        yaxis_title="Count",
-        height=400,
+        title='Delay Probability Distribution',
+        xaxis_title='Delay Probability (%)',
+        yaxis_title='Count',
+        height=350,
         showlegend=False,
-        margin=dict(l=40, r=40, t=60, b=40)
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
     )
     
     return fig
 
 
-def plot_risk_distribution(risk_levels):
+def plot_risk_breakdown(risk_counts):
     """
-    Create pie chart of risk level distribution
+    Create pie chart of risk category breakdown
     
     Args:
-        risk_levels: List of risk levels ('Low', 'Medium', 'High')
+        risk_counts: Dictionary of risk category counts
     
     Returns:
         plotly figure
     """
-    # Count risk levels
-    risk_counts = pd.Series(risk_levels).value_counts()
-    
-    # Define colors
-    colors_map = {
-        'Low': '#28a745',
-        'Medium': '#ffc107',
-        'High': '#dc3545'
+    colors = {
+        'Low': '#00CC96',
+        'Medium': '#FFA500',
+        'High': '#EF553B'
     }
-    colors = [colors_map.get(level, 'gray') for level in risk_counts.index]
+    
+    labels = list(risk_counts.keys())
+    values = list(risk_counts.values())
     
     fig = go.Figure(data=[go.Pie(
-        labels=risk_counts.index,
-        values=risk_counts.values,
-        marker=dict(colors=colors),
-        textinfo='label+percent+value',
-        hovertemplate='<b>%{label}</b><br>Count: %{value}<br>Percentage: %{percent}<extra></extra>'
+        labels=labels,
+        values=values,
+        marker=dict(colors=[colors[label] for label in labels]),
+        hole=0.4,
+        textinfo='label+percent',
+        textfont_size=14
     )])
     
     fig.update_layout(
-        title="Risk Level Distribution",
-        height=400,
-        margin=dict(l=20, r=20, t=60, b=20)
+        title='Risk Category Distribution',
+        height=350,
+        showlegend=True,
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
     )
     
     return fig
 
 
-def plot_geographic_map(df, probability_col='delay_probability', location_col='customer_state'):
+def plot_geographic_heatmap(df, location_col, metric_col, title):
     """
-    Create choropleth map of Brazil showing delay probabilities by state
+    Create geographic heatmap by state/city
     
     Args:
-        df: DataFrame with geographic data
-        probability_col: Column with probabilities
-        location_col: Column with state codes
+        df: Dataframe with location and metric data
+        location_col: Column name for location
+        metric_col: Column name for metric to plot
+        title: Chart title
     
     Returns:
         plotly figure
     """
-    # Aggregate by state
-    state_data = df.groupby(location_col)[probability_col].agg(['mean', 'count']).reset_index()
-    state_data.columns = ['state', 'avg_delay_prob', 'count']
-    state_data['avg_delay_prob_pct'] = state_data['avg_delay_prob'] * 100
+    # Aggregate by location
+    agg_df = df.groupby(location_col)[metric_col].mean().reset_index()
+    agg_df = agg_df.sort_values(metric_col, ascending=False).head(20)
     
-    # Create map
-    fig = px.choropleth(
-        state_data,
-        locations='state',
-        locationmode='geojson-id',
-        color='avg_delay_prob_pct',
-        hover_data={'state': True, 'avg_delay_prob_pct': ':.1f', 'count': True},
-        color_continuous_scale='Reds',
-        range_color=[0, 100],
-        labels={'avg_delay_prob_pct': 'Avg Delay %', 'count': 'Orders'}
-    )
-    
-    fig.update_layout(
-        title="Average Delay Probability by State",
-        height=600,
-        margin=dict(l=0, r=0, t=60, b=0)
-    )
-    
-    return fig
-
-
-def plot_time_series(df, date_col, value_col, title="Time Series"):
-    """
-    Create time series line plot
-    
-    Args:
-        df: DataFrame with time series data
-        date_col: Date column name
-        value_col: Value column name
-        title: Plot title
-    
-    Returns:
-        plotly figure
-    """
-    fig = go.Figure()
-    
-    fig.add_trace(go.Scatter(
-        x=df[date_col],
-        y=df[value_col],
-        mode='lines+markers',
-        line=dict(color='#FF6B6B', width=2),
-        marker=dict(size=6),
-        hovertemplate='%{x}<br>Value: %{y:.2f}<extra></extra>'
-    ))
+    fig = go.Figure(data=[go.Bar(
+        x=agg_df[location_col],
+        y=agg_df[metric_col],
+        marker=dict(
+            color=agg_df[metric_col],
+            colorscale='Reds',
+            showscale=True,
+            colorbar=dict(title="Risk %")
+        ),
+        text=[f'{v:.1f}%' for v in agg_df[metric_col]],
+        textposition='outside'
+    )])
     
     fig.update_layout(
         title=title,
-        xaxis_title=date_col,
-        yaxis_title=value_col,
+        xaxis_title=location_col.replace('_', ' ').title(),
+        yaxis_title='Average Delay Risk (%)',
         height=400,
-        margin=dict(l=40, r=40, t=60, b=40),
-        hovermode='x unified'
+        xaxis_tickangle=-45,
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
     )
     
     return fig
 
 
-def plot_confusion_matrix(y_true, y_pred, labels=['On Time', 'Delayed']):
+def plot_time_trends(df, date_col, metric_col, groupby='month'):
     """
-    Create confusion matrix heatmap
+    Create time series trend plot
     
     Args:
-        y_true: True labels
-        y_pred: Predicted labels
-        labels: Class labels
+        df: Dataframe with date and metric columns
+        date_col: Column name for date
+        metric_col: Column name for metric
+        groupby: Grouping period ('month', 'dayofweek', 'hour')
     
     Returns:
         plotly figure
     """
-    from sklearn.metrics import confusion_matrix
+    # Aggregate by time period
+    if groupby == 'month':
+        df['period'] = pd.to_datetime(df[date_col]).dt.to_period('M').astype(str)
+        xlabel = 'Month'
+    elif groupby == 'dayofweek':
+        df['period'] = pd.to_datetime(df[date_col]).dt.day_name()
+        xlabel = 'Day of Week'
+    else:  # hour
+        df['period'] = pd.to_datetime(df[date_col]).dt.hour
+        xlabel = 'Hour of Day'
     
-    cm = confusion_matrix(y_true, y_pred)
+    trend_df = df.groupby('period')[metric_col].mean().reset_index()
     
-    fig = go.Figure(data=go.Heatmap(
-        z=cm,
-        x=labels,
-        y=labels,
-        colorscale='Reds',
-        text=cm,
-        texttemplate='%{text}',
-        textfont={"size": 20},
-        hovertemplate='Actual: %{y}<br>Predicted: %{x}<br>Count: %{z}<extra></extra>'
+    fig = go.Figure()
+    
+    fig.add_trace(go.Scatter(
+        x=trend_df['period'],
+        y=trend_df[metric_col],
+        mode='lines+markers',
+        line=dict(color='steelblue', width=3),
+        marker=dict(size=8),
+        fill='tozeroy',
+        fillcolor='rgba(70, 130, 180, 0.2)'
     ))
     
     fig.update_layout(
-        title="Confusion Matrix",
-        xaxis_title="Predicted",
-        yaxis_title="Actual",
+        title=f'Delay Risk Trend by {xlabel}',
+        xaxis_title=xlabel,
+        yaxis_title='Average Delay Risk (%)',
+        height=350,
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
+    )
+    
+    return fig
+
+
+def create_metrics_cards(metrics_dict):
+    """
+    Display metrics in card format using Streamlit columns
+    
+    Args:
+        metrics_dict: Dictionary of metric name to value
+    """
+    num_metrics = len(metrics_dict)
+    cols = st.columns(min(num_metrics, 4))
+    
+    for idx, (label, value) in enumerate(metrics_dict.items()):
+        col_idx = idx % 4
+        with cols[col_idx]:
+            st.metric(label=label, value=value)
+
+
+def plot_correlation_heatmap(df, features):
+    """
+    Create correlation heatmap for selected features
+    
+    Args:
+        df: Dataframe with feature data
+        features: List of feature names
+    
+    Returns:
+        plotly figure
+    """
+    # Calculate correlation matrix
+    corr_matrix = df[features].corr()
+    
+    fig = go.Figure(data=go.Heatmap(
+        z=corr_matrix.values,
+        x=corr_matrix.columns,
+        y=corr_matrix.columns,
+        colorscale='RdBu',
+        zmid=0,
+        text=corr_matrix.values.round(2),
+        texttemplate='%{text}',
+        textfont={"size": 10},
+        colorbar=dict(title="Correlation")
+    ))
+    
+    fig.update_layout(
+        title='Feature Correlation Heatmap',
+        height=500,
+        width=500,
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
+    )
+    
+    return fig
+
+
+def create_comparison_chart(scenarios_data):
+    """
+    Create grouped bar chart comparing multiple scenarios
+    
+    Args:
+        scenarios_data: List of dicts with 'name' and 'probability' keys
+    
+    Returns:
+        plotly figure
+    """
+    names = [s['name'] for s in scenarios_data]
+    probs = [s['probability'] for s in scenarios_data]
+    colors = [s['color'] for s in scenarios_data]
+    
+    fig = go.Figure(data=[go.Bar(
+        x=names,
+        y=probs,
+        marker=dict(color=colors),
+        text=[f'{p:.1f}%' for p in probs],
+        textposition='outside'
+    )])
+    
+    fig.update_layout(
+        title='Scenario Risk Comparison',
+        xaxis_title='Scenario',
+        yaxis_title='Delay Risk (%)',
         height=400,
-        margin=dict(l=40, r=40, t=60, b=40)
+        showlegend=False,
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
+    )
+    
+    fig.add_hline(
+        y=30, line_dash="dash", line_color="green",
+        annotation_text="Low Risk Threshold"
+    )
+    fig.add_hline(
+        y=67, line_dash="dash", line_color="red",
+        annotation_text="High Risk Threshold"
     )
     
     return fig
