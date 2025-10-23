@@ -1,294 +1,295 @@
+"""
+Example Scenarios Page
+Pre-built scenarios demonstrating different risk levels
+"""
+
 import streamlit as st
 import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
-from utils.model_loader import ModelLoader
-from utils.visualization import create_gauge_chart
+from utils import (
+    load_model_artifacts,
+    predict_delay,
+    prepare_features,
+    create_example_order,
+    apply_custom_css,
+    show_page_header,
+    display_risk_badge,
+    plot_risk_gauge,
+    plot_feature_importance,
+    get_feature_descriptions
+)
 
+# Page config
 st.set_page_config(page_title="Example Scenarios", page_icon="🎯", layout="wide")
+apply_custom_css()
 
-# Custom CSS
-st.markdown("""
-    <style>
-    .scenario-card {
-        background-color: #f0f2f6;
-        padding: 20px;
-        border-radius: 10px;
-        margin-bottom: 20px;
-        border-left: 5px solid #3B82F6;
-    }
-    .risk-badge {
-        display: inline-block;
-        padding: 5px 10px;
-        border-radius: 15px;
-        font-weight: bold;
-        margin: 5px;
-    }
-    .risk-high { background-color: #f8d7da; color: #721c24; }
-    .risk-medium { background-color: #fff3cd; color: #856404; }
-    .risk-low { background-color: #d4edda; color: #155724; }
-    </style>
-""", unsafe_allow_html=True)
+# Load model
+model, final_metadata, feature_metadata, threshold = load_model_artifacts()
 
-st.title("🎯 Example Delivery Scenarios")
-st.markdown("Explore how different order characteristics affect delivery delay risk")
+# Header
+show_page_header(
+    title="Example Scenarios",
+    description="Explore pre-built order scenarios to understand how different factors affect delay risk",
+    icon="🎯"
+)
 
-# Initialize model loader
-@st.cache_resource
-def init_model_loader():
-    return ModelLoader(artifacts_path="./artifacts")
+# Scenario selection
+st.markdown("### 📋 Select a Scenario")
 
-model_loader = init_model_loader()
-model = model_loader.load_model()
-metadata, feature_metadata = model_loader.load_metadata()
+col1, col2, col3 = st.columns(3)
 
-# Define example scenarios
-scenarios = {
-    "🏃 Express Urban Delivery": {
-        "description": "Small, lightweight item delivered within the same state with express shipping",
-        "features": {
-            "n_items": 1, "n_sellers": 1, "n_products": 1, "sum_price": 150.0,
-            "sum_freight": 15.0, "total_payment": 165.0, "n_payment_records": 1,
-            "max_installments": 0, "avg_weight_g": 200, "avg_length_cm": 15,
-            "avg_height_cm": 10, "avg_width_cm": 10, "n_seller_states": 1,
-            "purch_year": 2024, "purch_month": 3, "purch_dayofweek": 2,
-            "purch_hour": 14, "purch_is_weekend": 0, 
-            "purch_hour_sin": np.sin(2 * np.pi * 14 / 24),
-            "purch_hour_cos": np.cos(2 * np.pi * 14 / 24),
-            "est_lead_days": 3, "n_categories": 1, "mode_category_count": 1,
-            "paytype_boleto": 0, "paytype_credit_card": 1, "paytype_debit_card": 0,
-            "paytype_not_defined": 0, "paytype_voucher": 0,
-            "mode_category": "informatica_acessorios", "seller_state_mode": "SP",
-            "customer_city": "sao paulo", "customer_state": "SP"
-        }
+with col1:
+    low_risk_btn = st.button("✅ Low Risk Order", use_container_width=True, type="secondary")
+
+with col2:
+    typical_btn = st.button("⚡ Typical Order", use_container_width=True, type="secondary")
+
+with col3:
+    high_risk_btn = st.button("🚨 High Risk Order", use_container_width=True, type="secondary")
+
+# Initialize session state
+if 'selected_scenario' not in st.session_state:
+    st.session_state.selected_scenario = 'typical'
+
+# Update scenario based on button clicks
+if low_risk_btn:
+    st.session_state.selected_scenario = 'low_risk'
+if typical_btn:
+    st.session_state.selected_scenario = 'typical'
+if high_risk_btn:
+    st.session_state.selected_scenario = 'high_risk'
+
+# Get scenario data
+scenario = st.session_state.selected_scenario
+scenario_data = create_example_order(scenario)
+
+st.markdown("---")
+
+# Scenario description
+scenario_descriptions = {
+    'low_risk': {
+        'title': '✅ Low Risk Order',
+        'description': """
+        This scenario represents an ideal order with minimal delay risk:
+        - Single seller, single item
+        - Small, lightweight product
+        - Same-state delivery (São Paulo)
+        - Credit card payment
+        - Short estimated lead time
+        - Weekday purchase during business hours
+        """
     },
-    "🏔️ Remote Rural Delivery": {
-        "description": "Heavy furniture delivered to remote location across multiple states",
-        "features": {
-            "n_items": 3, "n_sellers": 2, "n_products": 3, "sum_price": 2500.0,
-            "sum_freight": 350.0, "total_payment": 2850.0, "n_payment_records": 10,
-            "max_installments": 10, "avg_weight_g": 25000, "avg_length_cm": 150,
-            "avg_height_cm": 80, "avg_width_cm": 60, "n_seller_states": 2,
-            "purch_year": 2024, "purch_month": 3, "purch_dayofweek": 5,
-            "purch_hour": 20, "purch_is_weekend": 0,
-            "purch_hour_sin": np.sin(2 * np.pi * 20 / 24),
-            "purch_hour_cos": np.cos(2 * np.pi * 20 / 24),
-            "est_lead_days": 25, "n_categories": 2, "mode_category_count": 2,
-            "paytype_boleto": 1, "paytype_credit_card": 0, "paytype_debit_card": 0,
-            "paytype_not_defined": 0, "paytype_voucher": 0,
-            "mode_category": "moveis_decoracao", "seller_state_mode": "SP",
-            "customer_city": "rio branco", "customer_state": "AC"
-        }
+    'typical': {
+        'title': '⚡ Typical Order',
+        'description': """
+        This scenario represents a standard e-commerce order:
+        - Moderate number of items from one seller
+        - Medium-sized products
+        - Standard payment installments
+        - Within-state or nearby delivery
+        - Normal business day purchase
+        - Average lead time
+        """
     },
-    "🎄 Holiday Season Order": {
-        "description": "Multiple items ordered during peak holiday season",
-        "features": {
-            "n_items": 5, "n_sellers": 3, "n_products": 5, "sum_price": 500.0,
-            "sum_freight": 45.0, "total_payment": 545.0, "n_payment_records": 3,
-            "max_installments": 3, "avg_weight_g": 800, "avg_length_cm": 30,
-            "avg_height_cm": 20, "avg_width_cm": 25, "n_seller_states": 2,
-            "purch_year": 2024, "purch_month": 12, "purch_dayofweek": 6,
-            "purch_hour": 22, "purch_is_weekend": 1,
-            "purch_hour_sin": np.sin(2 * np.pi * 22 / 24),
-            "purch_hour_cos": np.cos(2 * np.pi * 22 / 24),
-            "est_lead_days": 15, "n_categories": 4, "mode_category_count": 2,
-            "paytype_boleto": 0, "paytype_credit_card": 1, "paytype_debit_card": 0,
-            "paytype_not_defined": 0, "paytype_voucher": 0,
-            "mode_category": "relogios_presentes", "seller_state_mode": "SP",
-            "customer_city": "belo horizonte", "customer_state": "MG"
-        }
-    },
-    "💊 Healthcare Essentials": {
-        "description": "Urgent healthcare and beauty products with expedited shipping",
-        "features": {
-            "n_items": 2, "n_sellers": 1, "n_products": 2, "sum_price": 180.0,
-            "sum_freight": 25.0, "total_payment": 205.0, "n_payment_records": 1,
-            "max_installments": 0, "avg_weight_g": 300, "avg_length_cm": 20,
-            "avg_height_cm": 15, "avg_width_cm": 15, "n_seller_states": 1,
-            "purch_year": 2024, "purch_month": 3, "purch_dayofweek": 1,
-            "purch_hour": 10, "purch_is_weekend": 0,
-            "purch_hour_sin": np.sin(2 * np.pi * 10 / 24),
-            "purch_hour_cos": np.cos(2 * np.pi * 10 / 24),
-            "est_lead_days": 5, "n_categories": 1, "mode_category_count": 2,
-            "paytype_boleto": 0, "paytype_credit_card": 0, "paytype_debit_card": 1,
-            "paytype_not_defined": 0, "paytype_voucher": 0,
-            "mode_category": "beleza_saude", "seller_state_mode": "SP",
-            "customer_city": "rio de janeiro", "customer_state": "RJ"
-        }
-    },
-    "🛏️ Bulk Home Goods": {
-        "description": "Large order of home goods and bedding from multiple sellers",
-        "features": {
-            "n_items": 8, "n_sellers": 4, "n_products": 6, "sum_price": 1200.0,
-            "sum_freight": 120.0, "total_payment": 1320.0, "n_payment_records": 6,
-            "max_installments": 6, "avg_weight_g": 1500, "avg_length_cm": 50,
-            "avg_height_cm": 30, "avg_width_cm": 40, "n_seller_states": 3,
-            "purch_year": 2024, "purch_month": 3, "purch_dayofweek": 3,
-            "purch_hour": 16, "purch_is_weekend": 0,
-            "purch_hour_sin": np.sin(2 * np.pi * 16 / 24),
-            "purch_hour_cos": np.cos(2 * np.pi * 16 / 24),
-            "est_lead_days": 12, "n_categories": 2, "mode_category_count": 5,
-            "paytype_boleto": 1, "paytype_credit_card": 0, "paytype_debit_card": 0,
-            "paytype_not_defined": 0, "paytype_voucher": 0,
-            "mode_category": "cama_mesa_banho", "seller_state_mode": "SC",
-            "customer_city": "porto alegre", "customer_state": "RS"
-        }
+    'high_risk': {
+        'title': '🚨 High Risk Order',
+        'description': """
+        This scenario represents a complex order with elevated delay risk:
+        - Multiple items from multiple sellers
+        - Large, heavy products
+        - Cross-country delivery (São Paulo to Manaus)
+        - Multiple product categories
+        - Weekend/late night purchase
+        - Long estimated lead time
+        - Boleto payment (slower processing)
+        """
     }
 }
 
-# Scenario selection
-selected_scenario = st.selectbox(
-    "Select a scenario to analyze:",
-    list(scenarios.keys()),
-    format_func=lambda x: x
-)
+st.markdown(f"## {scenario_descriptions[scenario]['title']}")
+st.markdown(scenario_descriptions[scenario]['description'])
 
-# Display scenario details
-scenario = scenarios[selected_scenario]
-st.markdown(f'<div class="scenario-card">', unsafe_allow_html=True)
-st.markdown(f"### {selected_scenario}")
-st.markdown(f"**Description:** {scenario['description']}")
-st.markdown('</div>', unsafe_allow_html=True)
-
-# Make prediction for selected scenario
-if st.button("🔮 Analyze Scenario", type="primary"):
-    
-    # Prepare features
-    features_df = pd.DataFrame([scenario['features']])
-    features_df = features_df[feature_metadata['feature_names']]
-    
-    # Get predictions
-    predictions, probabilities, risk_levels = model_loader.predict_with_probability(features_df)
-    
-    prediction = predictions[0]
-    probability = probabilities[0]
-    risk_level = risk_levels[0]
-    
-    # Display results
-    col1, col2, col3 = st.columns([2, 1, 1])
-    
-    with col1:
-        st.subheader("📊 Prediction Results")
-        
-        if prediction == 1:
-            st.error(f"⚠️ **HIGH RISK OF DELAY**")
-        else:
-            st.success(f"✅ **LOW RISK OF DELAY**")
-        
-        st.metric("Delay Probability", f"{probability*100:.1f}%")
-        
-        # Risk badge
-        risk_class = f"risk-{risk_level.lower()}"
-        st.markdown(f'<span class="risk-badge {risk_class}">Risk Level: {risk_level}</span>', 
-                   unsafe_allow_html=True)
-    
-    with col2:
-        # Gauge chart
-        fig = create_gauge_chart(probability * 100, metadata['optimal_threshold'] * 100)
-        st.plotly_chart(fig, use_container_width=True)
-    
-    with col3:
-        st.subheader("📋 Key Factors")
-        factors = []
-        
-        if scenario['features']['n_seller_states'] > 2:
-            factors.append("❌ Multiple seller states")
-        if scenario['features']['avg_weight_g'] > 5000:
-            factors.append("❌ Heavy items")
-        if scenario['features']['est_lead_days'] > 15:
-            factors.append("❌ Long lead time")
-        if scenario['features']['purch_is_weekend'] == 1:
-            factors.append("⚠️ Weekend order")
-        if scenario['features']['paytype_boleto'] == 1:
-            factors.append("⚠️ Boleto payment")
-        if scenario['features']['customer_state'] in ['AC', 'RR', 'AP', 'AM']:
-            factors.append("❌ Remote location")
-            
-        if factors:
-            for factor in factors:
-                st.write(factor)
-        else:
-            st.write("✅ No major risk factors")
-    
-    # Detailed breakdown
-    with st.expander("📋 Scenario Details"):
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.markdown("**📦 Order Details**")
-            st.write(f"- Items: {scenario['features']['n_items']}")
-            st.write(f"- Products: {scenario['features']['n_products']}")
-            st.write(f"- Sellers: {scenario['features']['n_sellers']}")
-            st.write(f"- Categories: {scenario['features']['n_categories']}")
-            st.write(f"- Main Category: {scenario['features']['mode_category']}")
-        
-        with col2:
-            st.markdown("**💰 Payment**")
-            st.write(f"- Total: R$ {scenario['features']['total_payment']:.2f}")
-            st.write(f"- Freight: R$ {scenario['features']['sum_freight']:.2f}")
-            st.write(f"- Installments: {scenario['features']['max_installments']}")
-            payment_type = [k.replace('paytype_', '') for k, v in scenario['features'].items() 
-                          if k.startswith('paytype_') and v == 1][0]
-            st.write(f"- Type: {payment_type}")
-        
-        with col3:
-            st.markdown("**📍 Logistics**")
-            st.write(f"- Weight: {scenario['features']['avg_weight_g']/1000:.1f} kg")
-            st.write(f"- Lead Time: {scenario['features']['est_lead_days']} days")
-            st.write(f"- From: {scenario['features']['seller_state_mode']}")
-            st.write(f"- To: {scenario['features']['customer_city']}, {scenario['features']['customer_state']}")
-
-# Comparison section
 st.markdown("---")
-st.subheader("🔄 Compare All Scenarios")
 
-if st.button("Compare All Scenarios"):
-    comparison_data = []
+# Make prediction
+features_df = prepare_features(scenario_data, feature_metadata['feature_names'])
+predictions, probabilities, risk_levels = predict_delay(model, features_df, threshold)
+
+prediction = predictions[0]
+probability = probabilities[0]
+risk_level = risk_levels[0]
+
+# Display prediction results
+st.markdown("### 🎯 Prediction Results")
+
+col1, col2 = st.columns([1, 2])
+
+with col1:
+    display_risk_badge(risk_level, probability)
     
-    for scenario_name, scenario_data in scenarios.items():
-        features_df = pd.DataFrame([scenario_data['features']])
-        features_df = features_df[feature_metadata['feature_names']]
+    st.markdown("#### Key Metrics")
+    st.metric("Delay Probability", f"{probability*100:.1f}%")
+    st.metric("Classification", "Delayed" if prediction == 1 else "On Time")
+    st.metric("Risk Level", risk_level)
+
+with col2:
+    # Risk gauge
+    fig_gauge = plot_risk_gauge(probability, threshold)
+    st.plotly_chart(fig_gauge, use_container_width=True)
+
+st.markdown("---")
+
+# Order details
+st.markdown("### 📦 Order Details")
+
+# Organize features into categories
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.markdown("#### 📊 Order Characteristics")
+    st.write(f"**Items**: {scenario_data['n_items']}")
+    st.write(f"**Sellers**: {scenario_data['n_sellers']}")
+    st.write(f"**Products**: {scenario_data['n_products']}")
+    st.write(f"**Categories**: {scenario_data['n_categories']}")
+    
+    st.markdown("#### 💰 Financial")
+    st.write(f"**Price**: R$ {scenario_data['sum_price']:.2f}")
+    st.write(f"**Freight**: R$ {scenario_data['sum_freight']:.2f}")
+    st.write(f"**Total**: R$ {scenario_data['total_payment']:.2f}")
+    st.write(f"**Installments**: {scenario_data['max_installments']}")
+
+with col2:
+    st.markdown("#### 📐 Product Dimensions")
+    st.write(f"**Weight**: {scenario_data['avg_weight_g']:.0f}g")
+    st.write(f"**Length**: {scenario_data['avg_length_cm']:.0f}cm")
+    st.write(f"**Height**: {scenario_data['avg_height_cm']:.0f}cm")
+    st.write(f"**Width**: {scenario_data['avg_width_cm']:.0f}cm")
+    
+    st.markdown("#### 🗺️ Geographic")
+    st.write(f"**Customer**: {scenario_data['customer_city'].title()}, {scenario_data['customer_state']}")
+    st.write(f"**Seller State**: {scenario_data['seller_state_mode']}")
+    st.write(f"**Seller States**: {scenario_data['n_seller_states']}")
+
+with col3:
+    st.markdown("#### ⏰ Temporal")
+    days_of_week = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    st.write(f"**Purchase Hour**: {scenario_data['purch_hour']}:00")
+    st.write(f"**Day of Week**: {days_of_week[scenario_data['purch_dayofweek']]}")
+    st.write(f"**Weekend**: {'Yes' if scenario_data['purch_is_weekend'] else 'No'}")
+    st.write(f"**Est. Lead Days**: {scenario_data['est_lead_days']:.0f}")
+    
+    st.markdown("#### 💳 Payment")
+    payment_types = []
+    if scenario_data['paytype_credit_card']: payment_types.append("Credit Card")
+    if scenario_data['paytype_debit_card']: payment_types.append("Debit Card")
+    if scenario_data['paytype_boleto']: payment_types.append("Boleto")
+    if scenario_data['paytype_voucher']: payment_types.append("Voucher")
+    if scenario_data['paytype_not_defined']: payment_types.append("Not Defined")
+    st.write(f"**Type**: {', '.join(payment_types)}")
+
+st.markdown("---")
+
+# Feature importance for this prediction
+st.markdown("### 📈 Feature Importance")
+st.markdown("*Top features contributing to the model's predictions*")
+
+# Get feature importance from model
+if hasattr(model, 'feature_importances_'):
+    feature_importance = model.feature_importances_
+    fig_importance = plot_feature_importance(
+        feature_metadata['feature_names'],
+        feature_importance,
+        top_n=15
+    )
+    st.plotly_chart(fig_importance, use_container_width=True)
+else:
+    st.info("Feature importance visualization not available for this model type.")
+
+st.markdown("---")
+
+# Recommendations
+st.markdown("### 💡 Recommendations")
+
+if risk_level == 'High':
+    st.error("⚠️ **High Risk - Immediate Action Required**")
+    st.markdown("""
+    **Recommended Actions:**
+    1. 🚀 Consider expedited shipping options
+    2. 📞 Proactively communicate with customer about delivery timeline
+    3. 🔍 Review and verify seller inventory and shipping capacity
+    4. 📊 Monitor this order closely throughout the fulfillment process
+    5. 💼 Evaluate splitting multi-seller orders if feasible
+    6. 🎯 Prioritize this order in warehouse operations
+    
+    **Key Risk Factors:**
+    - Multiple sellers/states increase coordination complexity
+    - Long-distance or cross-country delivery
+    - Large/heavy items require special handling
+    - Weekend/late-night orders may face processing delays
+    """)
+
+elif risk_level == 'Medium':
+    st.warning("⚠️ **Medium Risk - Enhanced Monitoring Recommended**")
+    st.markdown("""
+    **Recommended Actions:**
+    1. 👀 Monitor order progress more frequently than usual
+    2. ✅ Verify adequate inventory at fulfillment centers
+    3. 🚛 Confirm seller shipping capabilities and timelines
+    4. 📱 Set realistic customer expectations for delivery
+    5. 📋 Review logistics partner performance for this route
+    
+    **Key Risk Factors:**
+    - Some complexity in order composition or logistics
+    - Moderate distance or multiple items
+    - Potential for minor delays
+    """)
+
+else:
+    st.success("✅ **Low Risk - Standard Processing**")
+    st.markdown("""
+    **Recommended Actions:**
+    1. ✨ Proceed with standard fulfillment process
+    2. 📊 Continue routine monitoring for any unexpected issues
+    3. 🎯 Maintain current shipping and handling practices
+    4. 💚 This order is well-positioned for on-time delivery
+    
+    **Positive Factors:**
+    - Simple order composition
+    - Short delivery distance
+    - Optimal timing and payment method
+    - Favorable logistics characteristics
+    """)
+
+st.markdown("---")
+
+# Compare scenarios
+with st.expander("🔄 Compare All Scenarios"):
+    st.markdown("### Scenario Comparison")
+    
+    # Get predictions for all scenarios
+    scenarios_comparison = []
+    for scn in ['low_risk', 'typical', 'high_risk']:
+        scn_data = create_example_order(scn)
+        scn_features = prepare_features(scn_data, feature_metadata['feature_names'])
+        scn_pred, scn_prob, scn_risk = predict_delay(model, scn_features, threshold)
         
-        predictions, probabilities, risk_levels = model_loader.predict_with_probability(features_df)
-        
-        comparison_data.append({
-            'Scenario': scenario_name,
-            'Delay Risk (%)': probabilities[0] * 100,
-            'Risk Level': risk_levels[0],
-            'Prediction': 'Delayed' if predictions[0] == 1 else 'On Time',
-            'Lead Time': scenario_data['features']['est_lead_days'],
-            'Total Cost': scenario_data['features']['total_payment']
+        scenarios_comparison.append({
+            'Scenario': scn.replace('_', ' ').title(),
+            'Delay Probability': f"{scn_prob[0]*100:.1f}%",
+            'Risk Level': scn_risk[0],
+            'Prediction': 'Delayed' if scn_pred[0] == 1 else 'On Time',
+            'Items': scn_data['n_items'],
+            'Sellers': scn_data['n_sellers'],
+            'Total Payment': f"R$ {scn_data['total_payment']:.2f}",
+            'Est. Lead Days': scn_data['est_lead_days']
         })
     
-    comparison_df = pd.DataFrame(comparison_data)
-    comparison_df = comparison_df.sort_values('Delay Risk (%)', ascending=False)
-    
-    # Display comparison table
-    st.dataframe(
-        comparison_df.style.background_gradient(subset=['Delay Risk (%)'], cmap='RdYlGn_r'),
-        use_container_width=True
-    )
-    
-    # Bar chart
-    fig = go.Figure(data=[
-        go.Bar(
-            x=comparison_df['Scenario'],
-            y=comparison_df['Delay Risk (%)'],
-            marker_color=['red' if x > metadata['optimal_threshold']*100 else 'green' 
-                         for x in comparison_df['Delay Risk (%)']],
-            text=comparison_df['Delay Risk (%)'].round(1),
-            textposition='auto',
-        )
-    ])
-    
-    fig.add_hline(y=metadata['optimal_threshold']*100, line_dash="dash", 
-                  line_color="red", annotation_text="Risk Threshold")
-    
-    fig.update_layout(
-        title="Delay Risk Comparison Across Scenarios",
-        xaxis_title="Scenario",
-        yaxis_title="Delay Risk (%)",
-        height=400
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
+    comparison_df = pd.DataFrame(scenarios_comparison)
+    st.dataframe(comparison_df, use_container_width=True, hide_index=True)
+
+# Footer
+st.markdown("---")
+st.markdown("""
+<div style="text-align: center; color: gray;">
+    <p>💡 Try different scenarios to understand how various factors influence delay risk</p>
+</div>
+""", unsafe_allow_html=True)
