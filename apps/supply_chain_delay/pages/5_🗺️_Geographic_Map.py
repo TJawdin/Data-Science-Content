@@ -1,198 +1,329 @@
+"""
+Geographic Map Page
+Visualize delay risk across different geographic regions
+"""
+
 import streamlit as st
 import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
+import sys
+from pathlib import Path
 import plotly.express as px
-from utils.model_loader import ModelLoader
-import json
+import plotly.graph_objects as go
 
-st.set_page_config(page_title="Geographic Analysis", page_icon="🗺️", layout="wide")
+sys.path.append(str(Path(__file__).parent.parent))
 
-st.title("🗺️ Geographic Delivery Risk Analysis")
-st.markdown("Analyze delivery delay risks across Brazilian states and regions")
+from config import *
+from utils.model_loader import load_model, load_metadata, batch_predict
+from utils.feature_engineering import create_sample_data
 
-# Initialize model
+st.set_page_config(page_title="Geographic Map", page_icon="🗺️", layout="wide")
+
+# Load resources
 @st.cache_resource
-def init_model_loader():
-    return ModelLoader(artifacts_path="./artifacts")
+def load_resources():
+    model = load_model(str(MODEL_PATH))
+    final_metadata = load_metadata(str(FINAL_METADATA_PATH))
+    feature_metadata = load_metadata(str(FEATURE_METADATA_PATH))
+    return model, final_metadata, feature_metadata
 
-model_loader = init_model_loader()
-model = model_loader.load_model()
-metadata, feature_metadata = model_loader.load_metadata()
+model, final_metadata, feature_metadata = load_resources()
 
-# Brazilian states with coordinates
-brazil_states = {
-    'AC': {'name': 'Acre', 'lat': -9.0238, 'lon': -70.8120, 'region': 'North'},
-    'AL': {'name': 'Alagoas', 'lat': -9.5713, 'lon': -36.7820, 'region': 'Northeast'},
-    'AP': {'name': 'Amapá', 'lat': 0.9020, 'lon': -52.0030, 'region': 'North'},
-    'AM': {'name': 'Amazonas', 'lat': -3.4168, 'lon': -65.8561, 'region': 'North'},
-    'BA': {'name': 'Bahia', 'lat': -12.5797, 'lon': -41.7007, 'region': 'Northeast'},
-    'CE': {'name': 'Ceará', 'lat': -5.4984, 'lon': -39.3206, 'region': 'Northeast'},
-    'DF': {'name': 'Distrito Federal', 'lat': -15.7998, 'lon': -47.8645, 'region': 'Central-West'},
-    'ES': {'name': 'Espírito Santo', 'lat': -19.1834, 'lon': -40.3089, 'region': 'Southeast'},
-    'GO': {'name': 'Goiás', 'lat': -15.8270, 'lon': -49.8362, 'region': 'Central-West'},
-    'MA': {'name': 'Maranhão', 'lat': -4.9609, 'lon': -45.2744, 'region': 'Northeast'},
-    'MT': {'name': 'Mato Grosso', 'lat': -12.6819, 'lon': -56.9211, 'region': 'Central-West'},
-    'MS': {'name': 'Mato Grosso do Sul', 'lat': -20.7722, 'lon': -54.7852, 'region': 'Central-West'},
-    'MG': {'name': 'Minas Gerais', 'lat': -18.5122, 'lon': -44.5550, 'region': 'Southeast'},
-    'PA': {'name': 'Pará', 'lat': -1.9981, 'lon': -54.9306, 'region': 'North'},
-    'PB': {'name': 'Paraíba', 'lat': -7.2400, 'lon': -36.7820, 'region': 'Northeast'},
-    'PR': {'name': 'Paraná', 'lat': -25.2521, 'lon': -52.0215, 'region': 'South'},
-    'PE': {'name': 'Pernambuco', 'lat': -8.8137, 'lon': -36.9541, 'region': 'Northeast'},
-    'PI': {'name': 'Piauí', 'lat': -7.7183, 'lon': -42.7289, 'region': 'Northeast'},
-    'RJ': {'name': 'Rio de Janeiro', 'lat': -22.9068, 'lon': -43.1729, 'region': 'Southeast'},
-    'RN': {'name': 'Rio Grande do Norte', 'lat': -5.4026, 'lon': -36.9541, 'region': 'Northeast'},
-    'RS': {'name': 'Rio Grande do Sul', 'lat': -30.0346, 'lon': -51.2177, 'region': 'South'},
-    'RO': {'name': 'Rondônia', 'lat': -11.5057, 'lon': -63.5806, 'region': 'North'},
-    'RR': {'name': 'Roraima', 'lat': 1.9957, 'lon': -61.3333, 'region': 'North'},
-    'SC': {'name': 'Santa Catarina', 'lat': -27.2423, 'lon': -50.2189, 'region': 'South'},
-    'SP': {'name': 'São Paulo', 'lat': -23.5505, 'lon': -46.6333, 'region': 'Southeast'},
-    'SE': {'name': 'Sergipe', 'lat': -10.5741, 'lon': -37.3857, 'region': 'Northeast'},
-    'TO': {'name': 'Tocantins', 'lat': -10.1753, 'lon': -48.2982, 'region': 'North'}
-}
+# Title
+st.title("🗺️ Geographic Risk Distribution")
+st.markdown("""
+Visualize how delivery delay risk varies across different geographic regions.
+Identify high-risk areas and optimize your logistics strategy accordingly.
+""")
 
-# Calculate risk for each state
-@st.cache_data
-def calculate_state_risks(origin_state='SP'):
-    """Calculate delivery risks for each destination state from a given origin"""
+# Data source selection
+st.markdown("### 📊 Data Source")
+
+data_source = st.radio(
+    "Select data source:",
+    options=["Upload CSV", "Use Sample Data", "Use Batch Results"],
+    horizontal=True
+)
+
+df_to_analyze = None
+
+if data_source == "Upload CSV":
+    uploaded_file = st.file_uploader("Upload CSV file with geographic data", type=['csv'])
     
-    state_risks = []
-    
-    for state_code, state_info in brazil_states.items():
-        # Base features
-        features = {
-            'n_items': 2, 'n_sellers': 1, 'n_products': 2,
-            'sum_price': 200.0, 'sum_freight': 25.0, 'total_payment': 225.0,
-            'n_payment_records': 1, 'max_installments': 2,
-            'avg_weight_g': 800, 'avg_length_cm': 25, 
-            'avg_height_cm': 15, 'avg_width_cm': 20,
-            'n_seller_states': 1,
-            'purch_year': 2024, 'purch_month': 3, 'purch_dayofweek': 2,
-            'purch_hour': 14, 'purch_is_weekend': 0,
-            'purch_hour_sin': np.sin(2 * np.pi * 14 / 24),
-            'purch_hour_cos': np.cos(2 * np.pi * 14 / 24),
-            'n_categories': 1, 'mode_category_count': 2,
-            'paytype_boleto': 0, 'paytype_credit_card': 1, 
-            'paytype_debit_card': 0, 'paytype_not_defined': 0, 'paytype_voucher': 0,
-            'mode_category': 'informatica_acessorios',
-            'seller_state_mode': origin_state,
-            'customer_city': 'capital',  # Generic city
-            'customer_state': state_code
-        }
-        
-        # Adjust lead time based on distance
-        if state_code == origin_state:
-            features['est_lead_days'] = 3
-        elif state_info['region'] == brazil_states[origin_state]['region']:
-            features['est_lead_days'] = 7
-        else:
-            features['est_lead_days'] = 14
+    if uploaded_file:
+        try:
+            df = pd.read_csv(uploaded_file)
+            st.success(f"✅ Loaded {len(df)} orders")
             
-        # Remote states get longer lead times
-        if state_code in ['AC', 'RR', 'AP', 'AM']:
-            features['est_lead_days'] += 5
-            features['sum_freight'] = 80.0
-            features['total_payment'] = 280.0
+            if 'probability' not in df.columns:
+                with st.spinner("Generating predictions..."):
+                    df_to_analyze = batch_predict(
+                        model, df, feature_metadata['feature_names'],
+                        OPTIMAL_THRESHOLD, RISK_BANDS
+                    )
+            else:
+                df_to_analyze = df
         
-        # Convert to DataFrame
-        features_df = pd.DataFrame([features])[feature_metadata['feature_names']]
-        
-        # Get prediction
-        _, prob, risk = model_loader.predict_with_probability(features_df)
-        
-        state_risks.append({
-            'state': state_code,
-            'name': state_info['name'],
-            'lat': state_info['lat'],
-            'lon': state_info['lon'],
-            'region': state_info['region'],
-            'risk_probability': prob[0] * 100,
-            'risk_level': risk[0],
-            'lead_days': features['est_lead_days']
-        })
+        except Exception as e:
+            st.error(f"Error loading file: {str(e)}")
+
+elif data_source == "Use Sample Data":
+    if st.button("Generate Sample Data", type="primary"):
+        with st.spinner("Generating sample data..."):
+            sample_df = create_sample_data(n_samples=100)
+            df_to_analyze = batch_predict(
+                model, sample_df, feature_metadata['feature_names'],
+                OPTIMAL_THRESHOLD, RISK_BANDS
+            )
+            st.success(f"✅ Generated {len(df_to_analyze)} sample orders")
+
+elif data_source == "Use Batch Results":
+    if 'batch_results' in st.session_state:
+        df_to_analyze = st.session_state['batch_results']
+        st.success(f"✅ Using {len(df_to_analyze)} orders from batch predictions")
+    else:
+        st.warning("⚠️ No batch results found. Please run batch predictions first.")
+
+# Analysis section
+if df_to_analyze is not None and len(df_to_analyze) > 0:
+    st.markdown("---")
+    st.markdown("## 🗺️ Geographic Analysis")
     
-    return pd.DataFrame(state_risks)
-
-# UI Controls
-col1, col2 = st.columns([1, 3])
-
-with col1:
-    st.subheader("📍 Configuration")
-    origin_state = st.selectbox(
-        "Origin State (Seller)",
-        options=list(brazil_states.keys()),
-        index=list(brazil_states.keys()).index('SP'),
-        format_func=lambda x: f"{x} - {brazil_states[x]['name']}"
+    # Geography selection
+    geo_level = st.radio(
+        "Geographic Level:",
+        options=["customer_state", "customer_city", "seller_state_mode"],
+        format_func=lambda x: {
+            'customer_state': 'Customer State',
+            'customer_city': 'Customer City',
+            'seller_state_mode': 'Seller State'
+        }[x],
+        horizontal=True
     )
     
-    view_type = st.radio(
-        "View Type",
-        ["Risk Heatmap", "Regional Analysis", "Route Analysis"]
+    # Aggregate by geography
+    geo_stats = df_to_analyze.groupby(geo_level).agg({
+        'probability': ['mean', 'median', 'std', 'count'],
+        'risk_category': lambda x: (x == 'high').sum()
+    }).round(4)
+    
+    geo_stats.columns = ['Avg_Probability', 'Median_Probability', 'Std_Dev', 'Order_Count', 'High_Risk_Count']
+    geo_stats['Avg_Probability_Pct'] = (geo_stats['Avg_Probability'] * 100).round(1)
+    geo_stats['High_Risk_Pct'] = (geo_stats['High_Risk_Count'] / geo_stats['Order_Count'] * 100).round(1)
+    geo_stats = geo_stats.reset_index()
+    
+    # Create choropleth/bar chart
+    st.markdown("### 📊 Risk Distribution Map")
+    
+    # Sort by average probability
+    geo_stats_sorted = geo_stats.sort_values('Avg_Probability', ascending=False)
+    
+    # Create bar chart (since we don't have actual map coordinates)
+    fig = go.Figure()
+    
+    # Determine colors based on risk
+    colors = []
+    for prob in geo_stats_sorted['Avg_Probability']:
+        if prob * 100 <= RISK_BANDS['low']['max']:
+            colors.append(RISK_BANDS['low']['color'])
+        elif prob * 100 <= RISK_BANDS['medium']['max']:
+            colors.append(RISK_BANDS['medium']['color'])
+        else:
+            colors.append(RISK_BANDS['high']['color'])
+    
+    fig.add_trace(go.Bar(
+        x=geo_stats_sorted[geo_level],
+        y=geo_stats_sorted['Avg_Probability_Pct'],
+        marker=dict(color=colors),
+        text=geo_stats_sorted['Avg_Probability_Pct'],
+        texttemplate='%{text:.1f}%',
+        textposition='outside',
+        hovertemplate='<b>%{x}</b><br>Avg Delay Probability: %{y:.1f}%<br>Orders: ' + 
+                     geo_stats_sorted['Order_Count'].astype(str) + '<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        title=f"Average Delay Probability by {geo_level.replace('_', ' ').title()}",
+        xaxis_title=geo_level.replace('_', ' ').title(),
+        yaxis_title="Average Delay Probability (%)",
+        height=500,
+        showlegend=False,
+        hovermode='x',
+        plot_bgcolor='rgba(240,240,240,0.5)'
     )
     
-    show_labels = st.checkbox("Show State Labels", value=True)
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Top/Bottom performers
+    st.markdown("---")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### 🔴 Highest Risk Regions")
+        top_risk = geo_stats_sorted.head(5)
+        
+        for idx, row in top_risk.iterrows():
+            with st.container():
+                st.markdown(f"""
+                <div style='background-color: {RISK_BANDS['high']['color']}22; 
+                            padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem;
+                            border-left: 4px solid {RISK_BANDS['high']['color']};'>
+                    <strong>{row[geo_level]}</strong><br>
+                    Avg Risk: {row['Avg_Probability_Pct']:.1f}% | 
+                    Orders: {int(row['Order_Count'])} | 
+                    High Risk: {int(row['High_Risk_Count'])}
+                </div>
+                """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("### 🟢 Lowest Risk Regions")
+        bottom_risk = geo_stats_sorted.tail(5)
+        
+        for idx, row in bottom_risk.iterrows():
+            with st.container():
+                st.markdown(f"""
+                <div style='background-color: {RISK_BANDS['low']['color']}22; 
+                            padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem;
+                            border-left: 4px solid {RISK_BANDS['low']['color']};'>
+                    <strong>{row[geo_level]}</strong><br>
+                    Avg Risk: {row['Avg_Probability_Pct']:.1f}% | 
+                    Orders: {int(row['Order_Count'])} | 
+                    High Risk: {int(row['High_Risk_Count'])}
+                </div>
+                """, unsafe_allow_html=True)
+    
+    # Detailed statistics
+    st.markdown("---")
+    st.markdown("### 📊 Detailed Geographic Statistics")
+    
+    # Format for display
+    display_df = geo_stats_sorted[[
+        geo_level, 'Order_Count', 'Avg_Probability_Pct', 
+        'Median_Probability', 'Std_Dev', 'High_Risk_Count', 'High_Risk_Pct'
+    ]].copy()
+    
+    display_df.columns = [
+        'Location', 'Orders', 'Avg Risk (%)', 
+        'Median Prob', 'Std Dev', 'High Risk Orders', 'High Risk %'
+    ]
+    
+    st.dataframe(display_df, use_container_width=True, height=400)
+    
+    # Key insights
+    st.markdown("---")
+    st.markdown("### 💡 Geographic Insights")
+    
+    highest_risk_location = geo_stats_sorted.iloc[0]
+    lowest_risk_location = geo_stats_sorted.iloc[-1]
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric(
+            "Highest Risk Region",
+            highest_risk_location[geo_level],
+            f"{highest_risk_location['Avg_Probability_Pct']:.1f}%"
+        )
+    
+    with col2:
+        st.metric(
+            "Lowest Risk Region",
+            lowest_risk_location[geo_level],
+            f"{lowest_risk_location['Avg_Probability_Pct']:.1f}%"
+        )
+    
+    with col3:
+        risk_range = highest_risk_location['Avg_Probability_Pct'] - lowest_risk_location['Avg_Probability_Pct']
+        st.metric(
+            "Risk Variance",
+            f"{risk_range:.1f}%",
+            "Difference between regions"
+        )
+    
+    # Recommendations
+    st.markdown("---")
+    st.markdown("### 🎯 Strategic Recommendations")
+    
+    # Identify patterns
+    high_risk_regions = geo_stats_sorted[geo_stats_sorted['Avg_Probability'] > 0.4]
+    low_volume_high_risk = geo_stats_sorted[
+        (geo_stats_sorted['Avg_Probability'] > 0.4) & 
+        (geo_stats_sorted['Order_Count'] < geo_stats_sorted['Order_Count'].median())
+    ]
+    
+    if len(high_risk_regions) > 0:
+        st.warning(f"""
+        **High-Risk Regions Identified ({len(high_risk_regions)} locations)**
+        
+        Consider these actions for high-risk regions:
+        - Establish local distribution centers or partnerships
+        - Offer expedited shipping options
+        - Set realistic delivery time expectations
+        - Proactive customer communication about potential delays
+        """)
+    
+    if len(low_volume_high_risk) > 0:
+        st.info(f"""
+        **Low Volume, High Risk ({len(low_volume_high_risk)} locations)**
+        
+        These regions have both low order volume and high delay risk:
+        - Consider batching orders for efficiency
+        - Partner with specialized logistics providers
+        - Evaluate market potential vs operational costs
+        """)
+    
+    # Distribution insights
+    total_orders = geo_stats['Order_Count'].sum()
+    top_3_pct = geo_stats_sorted.head(3)['Order_Count'].sum() / total_orders * 100
+    
+    st.success(f"""
+    **Volume Distribution:**
+    - Top 3 regions account for {top_3_pct:.1f}% of total orders
+    - Focus optimization efforts on high-volume regions first
+    - Consider region-specific logistics strategies
+    """)
+    
+    # Download data
+    st.markdown("---")
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        csv_data = display_df.to_csv(index=False)
+        st.download_button(
+            label="📥 Download Geographic Analysis",
+            data=csv_data,
+            file_name=f"geographic_analysis_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
 
-# Calculate risks
-df_risks = calculate_state_risks(origin_state)
-
-with col2:
-    if view_type == "Risk Heatmap":
-        st.subheader(f"📊 Delivery Risk from {brazil_states[origin_state]['name']}")
+else:
+    st.info("👆 Select a data source and load data to begin geographic analysis")
+    
+    st.markdown("### 🗺️ What You Can Discover")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        #### Regional Patterns
+        - Which states have highest delay risk?
+        - Urban vs rural delivery performance
+        - Regional logistics challenges
         
-        # Create map
-        fig = go.Figure()
+        #### Volume Distribution
+        - Where are most orders coming from?
+        - High-volume vs high-risk regions
+        - Market penetration opportunities
+        """)
+    
+    with col2:
+        st.markdown("""
+        #### Optimization Opportunities
+        - Where to establish warehouses?
+        - Which regions need better logistics?
+        - Partnership opportunities
         
-        # Add markers for each state
-        fig.add_trace(go.Scattergeo(
-            lon=df_risks['lon'],
-            lat=df_risks['lat'],
-            text=df_risks['name'],
-            customdata=df_risks[['risk_probability', 'risk_level', 'lead_days']],
-            mode='markers+text' if show_labels else 'markers',
-            marker=dict(
-                size=df_risks['risk_probability']/2,
-                color=df_risks['risk_probability'],
-                colorscale='RdYlGn_r',
-                cmin=0,
-                cmax=100,
-                colorbar=dict(
-                    title="Risk %",
-                    thickness=20,
-                    len=0.7
-                ),
-                line=dict(width=1, color='white')
-            ),
-            textposition="top center",
-            textfont=dict(size=9),
-            hovertemplate='<b>%{text}</b><br>' +
-                         'Risk: %{customdata[0]:.1f}%<br>' +
-                         'Level: %{customdata[1]}<br>' +
-                         'Lead Time: %{customdata[2]} days<br>' +
-                         '<extra></extra>'
-        ))
-        
-        # Add origin marker
-        origin_info = brazil_states[origin_state]
-        fig.add_trace(go.Scattergeo(
-            lon=[origin_info['lon']],
-            lat=[origin_info['lat']],
-            text=[f"ORIGIN: {origin_info['name']}"],
-            mode='markers+text',
-            marker=dict(
-                size=15,
-                color='blue',
-                symbol='star',
-                line=dict(width=2, color='white')
-            ),
-            textposition="top center",
-            textfont=dict(size=12, color='blue'),
-            showlegend=False
-        ))
-        
-        fig.update_layout(
-            geo=dict(
-                scope='south america',
-                showland=True,
-                landcolor='rgb(243, 243, 243)',
-                countrycolor='rgb(204, 204, 204)',
-                coastlinecolor='rgb(204, 
+        #### Strategic Planning
+        - Market expansion priorities
+        - Resource allocation decisions
+        - Risk mitigation strategies
+        """)
