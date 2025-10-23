@@ -1,7 +1,6 @@
 """
 Utility functions for Supply Chain Delay Prediction App
 """
-
 from .model_loader import (
     load_model_artifacts,
     load_metadata,
@@ -9,7 +8,6 @@ from .model_loader import (
     get_risk_category,
     get_risk_color
 )
-
 from .feature_engineering import (
     prepare_single_prediction_input,
     prepare_batch_prediction_input,
@@ -17,7 +15,6 @@ from .feature_engineering import (
     get_feature_ranges,
     create_sample_scenarios
 )
-
 from .visualization import (
     plot_risk_gauge,
     plot_feature_importance,
@@ -27,17 +24,21 @@ from .visualization import (
     plot_time_trends,
     create_metrics_cards
 )
-
 from .theme_adaptive import (
     apply_custom_css,
     get_risk_color_scheme,
     style_dataframe
 )
-
 from .pdf_generator import (
     generate_prediction_report,
     generate_batch_report
 )
+
+# Helper function for info banners
+def display_info_banner(title, message, icon="ℹ️"):
+    """Display an info banner in the app"""
+    import streamlit as st
+    st.info(f"{icon} **{title}**: {message}")
 
 __all__ = [
     # Model functions
@@ -70,5 +71,8 @@ __all__ = [
     
     # PDF generation
     'generate_prediction_report',
-    'generate_batch_report'
+    'generate_batch_report',
+    
+    # Helper functions
+    'display_info_banner'
 ]
