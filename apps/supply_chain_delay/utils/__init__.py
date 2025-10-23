@@ -1,28 +1,74 @@
 """
-Supply Chain Delay Prediction - Utility Modules
+Utility functions for Supply Chain Delay Prediction App
 """
 
-from .model_loader import load_model_artifacts, predict_delay
-from .feature_engineering import prepare_features, validate_input
+from .model_loader import (
+    load_model_artifacts,
+    load_metadata,
+    predict_delay_risk,
+    get_risk_category,
+    get_risk_color
+)
+
+from .feature_engineering import (
+    prepare_single_prediction_input,
+    prepare_batch_prediction_input,
+    validate_input_data,
+    get_feature_ranges,
+    create_sample_scenarios
+)
+
 from .visualization import (
     plot_risk_gauge,
     plot_feature_importance,
-    plot_shap_waterfall,
-    plot_probability_distribution
+    plot_probability_distribution,
+    plot_risk_breakdown,
+    plot_geographic_heatmap,
+    plot_time_trends,
+    create_metrics_cards
 )
-from .pdf_generator import generate_prediction_report
-from .theme_adaptive import get_risk_color, format_probability
+
+from .theme_adaptive import (
+    apply_custom_css,
+    get_risk_color_scheme,
+    style_dataframe
+)
+
+from .pdf_generator import (
+    generate_prediction_report,
+    generate_batch_report
+)
 
 __all__ = [
+    # Model functions
     'load_model_artifacts',
-    'predict_delay',
-    'prepare_features',
-    'validate_input',
+    'load_metadata',
+    'predict_delay_risk',
+    'get_risk_category',
+    'get_risk_color',
+    
+    # Feature engineering
+    'prepare_single_prediction_input',
+    'prepare_batch_prediction_input',
+    'validate_input_data',
+    'get_feature_ranges',
+    'create_sample_scenarios',
+    
+    # Visualization
     'plot_risk_gauge',
     'plot_feature_importance',
-    'plot_shap_waterfall',
     'plot_probability_distribution',
+    'plot_risk_breakdown',
+    'plot_geographic_heatmap',
+    'plot_time_trends',
+    'create_metrics_cards',
+    
+    # Theme
+    'apply_custom_css',
+    'get_risk_color_scheme',
+    'style_dataframe',
+    
+    # PDF generation
     'generate_prediction_report',
-    'get_risk_color',
-    'format_probability'
+    'generate_batch_report'
 ]
