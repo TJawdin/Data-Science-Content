@@ -8,6 +8,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from pathlib import Path
+import os
 
 
 @st.cache_resource
@@ -19,7 +20,9 @@ def load_model_artifacts():
         tuple: (model, final_metadata, feature_metadata, threshold)
     """
     try:
-        artifacts_path = Path("artifacts")
+        # Get the correct path to artifacts directory
+        current_dir = Path(__file__).parent.parent
+        artifacts_path = current_dir / "artifacts"
         
         # Load model
         with open(artifacts_path / "best_model_lightgbm.pkl", "rb") as f:
@@ -38,6 +41,10 @@ def load_model_artifacts():
         
         return model, final_metadata, feature_metadata, threshold
     
+    except FileNotFoundError as e:
+        st.error(f"Error: Could not find artifacts files. Please ensure they are in the 'artifacts' folder.")
+        st.error(f"Details: {str(e)}")
+        st.stop()
     except Exception as e:
         st.error(f"Error loading model artifacts: {str(e)}")
         st.stop()
@@ -51,7 +58,9 @@ def load_metadata():
         tuple: (final_metadata, feature_metadata)
     """
     try:
-        artifacts_path = Path("artifacts")
+        # Get the correct path to artifacts directory
+        current_dir = Path(__file__).parent.parent
+        artifacts_path = current_dir / "artifacts"
         
         with open(artifacts_path / "final_metadata.json", "r") as f:
             final_metadata = json.load(f)
@@ -61,6 +70,11 @@ def load_metadata():
         
         return final_metadata, feature_metadata
     
+    except FileNotFoundError as e:
+        st.error(f"Error: Could not find metadata files in artifacts folder.")
+        st.error(f"Details: {str(e)}")
+        st.info(f"Looking in: {artifacts_path}")
+        st.stop()
     except Exception as e:
         st.error(f"Error loading metadata: {str(e)}")
         st.stop()
@@ -165,26 +179,6 @@ def batch_predict(model, input_data, threshold, final_metadata):
         return None
 
 
-def get_model_performance(final_metadata):
-    """
-    Extract and format model performance metrics
-    
-    Args:
-        final_metadata: Dictionary with model metrics
-    
-    Returns:
-        dict: Formatted performance metrics
-    """
-    return {
-        'AUC-ROC': f"{final_metadata['best_model_auc']:.2%}",
-        'Precision': f"{final_metadata['best_model_precision']:.2%}",
-        'Recall': f"{final_metadata['best_model_recall']:.2%}",
-        'F1-Score': f"{final_metadata['best_model_f1']:.2%}",
-        'Threshold': f"{final_metadata['optimal_threshold']:.4f}",
-        'Training Samples': f"{final_metadata['n_samples_train']:,}",
-        'Test Samples': f"{final_metadata['n_samples_test']:,}",
-        'Training Date': final_metadata['training_date']
-    }
 def get_model_performance(final_metadata):
     """
     Format model performance metrics for display
