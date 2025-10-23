@@ -24,9 +24,25 @@ def load_model_artifacts():
         current_dir = Path(__file__).parent.parent
         artifacts_path = current_dir / "artifacts"
         
-        # Load model
-        with open(artifacts_path / "best_model_lightgbm.pkl", "rb") as f:
-            model = pickle.load(f)
+        # Load model with compatibility fix for different Python versions
+        model_path = artifacts_path / "best_model_lightgbm.pkl"
+        try:
+            # Try normal pickle load first
+            with open(model_path, "rb") as f:
+                model = pickle.load(f)
+        except (TypeError, ValueError) as e:
+            # If that fails, try with encoding parameter for cross-version compatibility
+            if "STACK_GLOBAL requires str" in str(e):
+                st.warning("⚠️ Model file format compatibility issue detected. Attempting to load with compatibility mode...")
+                try:
+                    with open(model_path, "rb") as f:
+                        model = pickle.load(f, encoding='latin1')
+                except Exception:
+                    # Last resort: try with fix_imports
+                    with open(model_path, "rb") as f:
+                        model = pickle.load(f, fix_imports=True, encoding='bytes')
+            else:
+                raise e
         
         # Load final metadata
         with open(artifacts_path / "final_metadata.json", "r") as f:
@@ -44,9 +60,18 @@ def load_model_artifacts():
     except FileNotFoundError as e:
         st.error(f"Error: Could not find artifacts files. Please ensure they are in the 'artifacts' folder.")
         st.error(f"Details: {str(e)}")
+        st.info(f"Looking in: {artifacts_path}")
         st.stop()
     except Exception as e:
         st.error(f"Error loading model artifacts: {str(e)}")
+        st.error(f"Error type: {type(e).__name__}")
+        st.info("""
+        **Troubleshooting:**
+        - This may be a Python version compatibility issue
+        - The model was likely trained with a different Python version
+        - Try re-training the model with your current Python version
+        - Or use a Python environment matching the training version
+        """)
         st.stop()
 
 
