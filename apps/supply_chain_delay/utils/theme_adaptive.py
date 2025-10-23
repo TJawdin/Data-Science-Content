@@ -1,260 +1,313 @@
 """
-Theme and Formatting Utilities
-Consistent styling across the application
+Theme and styling utilities for the Streamlit app
 """
 
 import streamlit as st
-
-
-def get_risk_color(risk_level):
-    """
-    Get color code for risk level
-    
-    Args:
-        risk_level: 'Low', 'Medium', or 'High'
-    
-    Returns:
-        str: Hex color code
-    """
-    colors = {
-        "Low": "#28a745",      # Green
-        "Medium": "#ffc107",   # Yellow/Orange
-        "High": "#dc3545"      # Red
-    }
-    return colors.get(risk_level, "#6c757d")
-
-
-def get_risk_icon(risk_level):
-    """
-    Get emoji icon for risk level
-    
-    Args:
-        risk_level: 'Low', 'Medium', or 'High'
-    
-    Returns:
-        str: Emoji icon
-    """
-    icons = {
-        "Low": "✅",
-        "Medium": "⚠️",
-        "High": "🚨"
-    }
-    return icons.get(risk_level, "❓")
-
-
-def format_probability(probability):
-    """
-    Format probability as percentage string
-    
-    Args:
-        probability: Float probability (0-1)
-    
-    Returns:
-        str: Formatted percentage
-    """
-    return f"{probability * 100:.1f}%"
-
-
-def format_currency(amount):
-    """
-    Format amount as Brazilian Real currency
-    
-    Args:
-        amount: Numeric amount
-    
-    Returns:
-        str: Formatted currency
-    """
-    return f"R$ {amount:,.2f}"
-
-
-def create_metric_card(label, value, delta=None, help_text=None):
-    """
-    Create a styled metric card
-    
-    Args:
-        label: Metric label
-        value: Metric value
-        delta: Optional delta value
-        help_text: Optional help text
-    """
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.metric(label=label, value=value, delta=delta, help=help_text)
-
-
-def display_risk_badge(risk_level, probability):
-    """
-    Display a styled risk badge
-    
-    Args:
-        risk_level: 'Low', 'Medium', or 'High'
-        probability: Delay probability (0-1)
-    """
-    color = get_risk_color(risk_level)
-    icon = get_risk_icon(risk_level)
-    prob_pct = format_probability(probability)
-    
-    st.markdown(
-        f"""
-        <div style="
-            background-color: {color};
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            font-size: 24px;
-            font-weight: bold;
-            margin: 10px 0;
-        ">
-            {icon} {risk_level} Risk - {prob_pct}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-
-def display_info_box(title, content, box_type="info"):
-    """
-    Display a styled information box
-    
-    Args:
-        title: Box title
-        content: Box content
-        box_type: 'info', 'success', 'warning', or 'error'
-    """
-    colors = {
-        "info": "#0dcaf0",
-        "success": "#28a745",
-        "warning": "#ffc107",
-        "error": "#dc3545"
-    }
-    
-    bg_color = colors.get(box_type, colors["info"])
-    
-    st.markdown(
-        f"""
-        <div style="
-            background-color: {bg_color}20;
-            border-left: 5px solid {bg_color};
-            padding: 15px;
-            border-radius: 5px;
-            margin: 10px 0;
-        ">
-            <h4 style="margin: 0 0 10px 0; color: {bg_color};">{title}</h4>
-            <p style="margin: 0;">{content}</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
 
 
 def apply_custom_css():
     """
     Apply custom CSS styling to the app
     """
-    st.markdown(
-        """
-        <style>
-        /* Main container */
+    st.markdown("""
+    <style>
+    /* Main container */
+    .main {
+        padding: 0rem 1rem;
+    }
+    
+    /* Headers */
+    h1 {
+        color: #1f77b4;
+        font-weight: 600;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #1f77b4;
+    }
+    
+    h2 {
+        color: #2c3e50;
+        font-weight: 500;
+        margin-top: 1.5rem;
+    }
+    
+    h3 {
+        color: #34495e;
+        font-weight: 500;
+    }
+    
+    /* Metric cards */
+    [data-testid="stMetricValue"] {
+        font-size: 2rem;
+        font-weight: 600;
+    }
+    
+    [data-testid="stMetricLabel"] {
+        font-size: 0.9rem;
+        color: #555;
+    }
+    
+    /* Info boxes */
+    .stAlert {
+        border-radius: 0.5rem;
+        padding: 1rem;
+    }
+    
+    /* Buttons */
+    .stButton > button {
+        border-radius: 0.5rem;
+        font-weight: 500;
+        padding: 0.5rem 2rem;
+        transition: all 0.3s ease;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background-color: #f8f9fa;
+    }
+    
+    /* Tables */
+    .dataframe {
+        font-size: 0.9rem;
+    }
+    
+    /* Risk badges */
+    .risk-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 1rem;
+        font-weight: 600;
+        font-size: 0.85rem;
+        display: inline-block;
+    }
+    
+    .risk-low {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .risk-medium {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    
+    .risk-high {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    /* Cards */
+    .prediction-card {
+        background-color: #ffffff;
+        border: 1px solid #e0e0e0;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    /* Progress bars */
+    .stProgress > div > div > div {
+        background-color: #1f77b4;
+    }
+    
+    /* File uploader */
+    [data-testid="stFileUploader"] {
+        border: 2px dashed #1f77b4;
+        border-radius: 0.5rem;
+        padding: 2rem;
+    }
+    
+    /* Expander */
+    .streamlit-expanderHeader {
+        font-weight: 500;
+        font-size: 1rem;
+    }
+    
+    /* Success/Warning/Error messages */
+    .element-container .stSuccess {
+        background-color: #d4edda;
+        border-left: 4px solid #28a745;
+    }
+    
+    .element-container .stWarning {
+        background-color: #fff3cd;
+        border-left: 4px solid #ffc107;
+    }
+    
+    .element-container .stError {
+        background-color: #f8d7da;
+        border-left: 4px solid #dc3545;
+    }
+    
+    /* Hide Streamlit branding */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    
+    /* Responsive design */
+    @media (max-width: 768px) {
         .main {
-            padding: 2rem;
+            padding: 0rem 0.5rem;
         }
         
-        /* Headers */
         h1 {
-            color: #1f1f1f;
-            font-weight: 700;
+            font-size: 1.5rem;
         }
-        
-        h2, h3 {
-            color: #2c3e50;
-            font-weight: 600;
-        }
-        
-        /* Sidebar */
-        .css-1d391kg {
-            background-color: #f8f9fa;
-        }
-        
-        /* Buttons */
-        .stButton>button {
-            background-color: #FF6B6B;
-            color: white;
-            border-radius: 5px;
-            border: none;
-            padding: 0.5rem 1rem;
-            font-weight: 600;
-            transition: all 0.3s;
-        }
-        
-        .stButton>button:hover {
-            background-color: #ff5252;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        
-        /* Metrics */
-        [data-testid="stMetricValue"] {
-            font-size: 2rem;
-            font-weight: 700;
-        }
-        
-        /* Cards */
-        .element-container {
-            border-radius: 5px;
-        }
-        
-        /* Expander */
-        .streamlit-expanderHeader {
-            background-color: #f8f9fa;
-            border-radius: 5px;
-        }
-        
-        /* Success/Error messages */
-        .stSuccess, .stError, .stWarning, .stInfo {
-            border-radius: 5px;
-            padding: 1rem;
-        }
-        
-        /* DataFrame */
-        .dataframe {
-            border-radius: 5px;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 
-def show_page_header(title, description, icon="📊"):
+def get_risk_color_scheme():
     """
-    Display a consistent page header
+    Get color scheme for risk categories
+    
+    Returns:
+        dict: Risk category to color mapping
+    """
+    return {
+        'Low': {
+            'primary': '#00CC96',
+            'light': '#d4edda',
+            'dark': '#155724',
+            'bg': '#E8F8F5'
+        },
+        'Medium': {
+            'primary': '#FFA500',
+            'light': '#fff3cd',
+            'dark': '#856404',
+            'bg': '#FFF4E6'
+        },
+        'High': {
+            'primary': '#EF553B',
+            'light': '#f8d7da',
+            'dark': '#721c24',
+            'bg': '#FADBD8'
+        }
+    }
+
+
+def style_dataframe(df, risk_column='risk_category'):
+    """
+    Apply styling to dataframe based on risk categories
     
     Args:
-        title: Page title
-        description: Page description
-        icon: Page icon emoji
-    """
-    st.markdown(f"# {icon} {title}")
-    st.markdown(f"*{description}*")
-    st.markdown("---")
-
-
-def create_two_column_layout():
-    """
-    Create a standard two-column layout
+        df: DataFrame to style
+        risk_column: Column name containing risk categories
     
     Returns:
-        tuple: (left_column, right_column)
+        Styled dataframe
     """
-    return st.columns(2)
+    def highlight_risk(row):
+        if risk_column in row:
+            risk = row[risk_column]
+            colors = get_risk_color_scheme()
+            
+            if risk == 'Low':
+                return ['background-color: ' + colors['Low']['light']] * len(row)
+            elif risk == 'Medium':
+                return ['background-color: ' + colors['Medium']['light']] * len(row)
+            elif risk == 'High':
+                return ['background-color: ' + colors['High']['light']] * len(row)
+        
+        return [''] * len(row)
+    
+    if risk_column in df.columns:
+        return df.style.apply(highlight_risk, axis=1)
+    else:
+        return df
 
 
-def create_three_column_layout():
+def create_risk_badge_html(risk_category, probability):
     """
-    Create a standard three-column layout
+    Create HTML for risk badge
+    
+    Args:
+        risk_category: Risk level ('Low', 'Medium', 'High')
+        probability: Probability percentage
     
     Returns:
-        tuple: (col1, col2, col3)
+        str: HTML string
     """
-    return st.columns(3)
+    colors = get_risk_color_scheme()
+    color_scheme = colors.get(risk_category, colors['Medium'])
+    
+    html = f"""
+    <div style="
+        background-color: {color_scheme['light']};
+        color: {color_scheme['dark']};
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        border-left: 4px solid {color_scheme['primary']};
+        font-weight: 600;
+        text-align: center;
+        margin: 0.5rem 0;
+    ">
+        <div style="font-size: 0.9rem; opacity: 0.8;">Risk Level</div>
+        <div style="font-size: 1.5rem; margin: 0.25rem 0;">{risk_category}</div>
+        <div style="font-size: 1.2rem; color: {color_scheme['primary']};">{probability:.1f}%</div>
+    </div>
+    """
+    return html
+
+
+def create_feature_card_html(title, value, icon="📊"):
+    """
+    Create HTML for feature card
+    
+    Args:
+        title: Card title
+        value: Card value
+        icon: Emoji icon
+    
+    Returns:
+        str: HTML string
+    """
+    html = f"""
+    <div style="
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin: 0.5rem 0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    ">
+        <div style="font-size: 2rem; margin-bottom: 0.5rem;">{icon}</div>
+        <div style="font-size: 0.9rem; opacity: 0.9;">{title}</div>
+        <div style="font-size: 1.5rem; font-weight: 600; margin-top: 0.25rem;">{value}</div>
+    </div>
+    """
+    return html
+
+
+def display_info_banner(message, banner_type='info'):
+    """
+    Display styled information banner
+    
+    Args:
+        message: Message to display
+        banner_type: Type of banner ('info', 'success', 'warning', 'error')
+    """
+    colors = {
+        'info': {'bg': '#e3f2fd', 'border': '#1976d2', 'icon': 'ℹ️'},
+        'success': {'bg': '#e8f5e9', 'border': '#4caf50', 'icon': '✅'},
+        'warning': {'bg': '#fff3e0', 'border': '#ff9800', 'icon': '⚠️'},
+        'error': {'bg': '#ffebee', 'border': '#f44336', 'icon': '❌'}
+    }
+    
+    style = colors.get(banner_type, colors['info'])
+    
+    st.markdown(f"""
+    <div style="
+        background-color: {style['bg']};
+        border-left: 4px solid {style['border']};
+        padding: 1rem;
+        border-radius: 0.25rem;
+        margin: 1rem 0;
+    ">
+        <strong>{style['icon']} {message}</strong>
+    </div>
+    """, unsafe_allow_html=True)
