@@ -190,13 +190,14 @@ def predict_delay(model, input_data, threshold):
         return predictions, probs, risk_levels
 
 
-def prepare_features(order_data, feature_names):
+def prepare_features(order_data, feature_names_or_metadata):
     """
     Alias for prepare_single_prediction_input
+    Handles both just feature names (list) or full feature_metadata (dict)
     
     Args:
         order_data: Dictionary or DataFrame with order data
-        feature_names: List of expected feature names
+        feature_names_or_metadata: Either list of feature names OR full feature_metadata dict
         
     Returns:
         DataFrame: Prepared features
@@ -205,12 +206,23 @@ def prepare_features(order_data, feature_names):
     if order_data is None:
         raise ValueError("order_data is None. Check that create_example_order is returning data correctly.")
     
-    if isinstance(order_data, dict):
-        return prepare_single_prediction_input(order_data, {'feature_names': feature_names})
-    elif isinstance(order_data, pd.DataFrame):
-        return prepare_batch_prediction_input(order_data, {'feature_names': feature_names})
+    # Handle both cases: just feature names list or full metadata dict
+    if isinstance(feature_names_or_metadata, list):
+        # We have just feature names - need to load full metadata
+        _, feature_metadata = load_metadata()
+    elif isinstance(feature_names_or_metadata, dict):
+        # We have full metadata already
+        feature_metadata = feature_names_or_metadata
     else:
-        raise ValueError(f"order_data must be a dict or DataFrame, got {type(order_data).__name__}. Value: {order_data}")
+        raise ValueError(f"feature_names_or_metadata must be a list or dict, got {type(feature_names_or_metadata)}")
+    
+    # Process the data
+    if isinstance(order_data, dict):
+        return prepare_single_prediction_input(order_data, feature_metadata)
+    elif isinstance(order_data, pd.DataFrame):
+        return prepare_batch_prediction_input(order_data, feature_metadata)
+    else:
+        raise ValueError(f"order_data must be a dict or DataFrame, got {type(order_data).__name__}")
 
 
 def create_example_order(scenario_name=None):
