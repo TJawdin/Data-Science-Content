@@ -1,6 +1,5 @@
 """
-Feature Engineering Module
-Handles data validation and feature preparation
+Feature engineering and input preparation utilities
 """
 
 import pandas as pd
@@ -9,232 +8,277 @@ import streamlit as st
 from datetime import datetime
 
 
-def validate_input(data, feature_names):
+def prepare_single_prediction_input(user_inputs, feature_metadata):
     """
-    Validate input data has all required features
+    Prepare single prediction input from user form data
     
     Args:
-        data: Input data (dict or DataFrame)
-        feature_names: List of required feature names
+        user_inputs: Dictionary of user input values
+        feature_metadata: Feature metadata dictionary
     
     Returns:
-        tuple: (is_valid, error_message)
+        DataFrame: Single row with all required features
     """
-    if isinstance(data, dict):
-        data_keys = set(data.keys())
-    elif isinstance(data, pd.DataFrame):
-        data_keys = set(data.columns)
-    else:
-        return False, "Invalid data format. Must be dict or DataFrame."
+    # Create empty dataframe with all features
+    feature_names = feature_metadata['feature_names']
+    input_df = pd.DataFrame(columns=feature_names)
     
-    required_features = set(feature_names)
-    missing_features = required_features - data_keys
+    # Add user inputs
+    for key, value in user_inputs.items():
+        if key in feature_names:
+            input_df.loc[0, key] = value
+    
+    # Fill missing values with defaults
+    for col in feature_names:
+        if col not in input_df.columns or pd.isna(input_df.loc[0, col]):
+            input_df.loc[0, col] = get_default_value(col, feature_metadata)
+    
+    # Ensure correct data types
+    input_df = ensure_correct_dtypes(input_df, feature_metadata)
+    
+    return input_df
+
+
+def prepare_batch_prediction_input(df, feature_metadata):
+    """
+    Prepare batch prediction input from uploaded dataframe
+    
+    Args:
+        df: Input dataframe
+        feature_metadata: Feature metadata dictionary
+    
+    Returns:
+        DataFrame: Prepared data with all required features
+    """
+    feature_names = feature_metadata['feature_names']
+    
+    # Create dataframe with all required features
+    prepared_df = pd.DataFrame(columns=feature_names)
+    
+    # Copy over existing features
+    for col in feature_names:
+        if col in df.columns:
+            prepared_df[col] = df[col]
+        else:
+            prepared_df[col] = get_default_value(col, feature_metadata)
+    
+    # Ensure correct data types
+    prepared_df = ensure_correct_dtypes(prepared_df, feature_metadata)
+    
+    return prepared_df
+
+
+def validate_input_data(df, feature_metadata):
+    """
+    Validate input data has required features and correct types
+    
+    Args:
+        df: Input dataframe
+        feature_metadata: Feature metadata dictionary
+    
+    Returns:
+        tuple: (is_valid, error_messages)
+    """
+    errors = []
+    
+    # Check for required features
+    required_features = feature_metadata['feature_names']
+    missing_features = set(required_features) - set(df.columns)
     
     if missing_features:
-        return False, f"Missing features: {', '.join(missing_features)}"
+        errors.append(f"Missing features: {', '.join(missing_features)}")
     
-    return True, None
+    # Check numeric features are numeric
+    for col in feature_metadata['numeric_feats']:
+        if col in df.columns:
+            if not pd.api.types.is_numeric_dtype(df[col]):
+                errors.append(f"Feature '{col}' should be numeric")
+    
+    # Check for null values in critical features
+    critical_features = ['n_items', 'sum_price', 'customer_state']
+    for col in critical_features:
+        if col in df.columns:
+            if df[col].isna().any():
+                errors.append(f"Feature '{col}' contains null values")
+    
+    is_valid = len(errors) == 0
+    return is_valid, errors
 
 
-def prepare_features(input_data, feature_names):
+def get_default_value(feature_name, feature_metadata):
     """
-    Prepare features in correct order for model prediction
+    Get default value for a feature
     
     Args:
-        input_data: Input data (dict or DataFrame)
-        feature_names: Ordered list of feature names
+        feature_name: Name of feature
+        feature_metadata: Feature metadata dictionary
     
     Returns:
-        pd.DataFrame: Features ready for prediction
+        Default value for the feature
     """
-    if isinstance(input_data, dict):
-        df = pd.DataFrame([input_data])
-    else:
-        df = input_data.copy()
+    # Numeric features
+    if feature_name in feature_metadata['numeric_feats']:
+        defaults = {
+            'n_items': 1,
+            'n_sellers': 1,
+            'n_products': 1,
+            'sum_price': 100.0,
+            'sum_freight': 10.0,
+            'total_payment': 110.0,
+            'n_payment_records': 1,
+            'max_installments': 1,
+            'avg_weight_g': 500,
+            'avg_length_cm': 20,
+            'avg_height_cm': 10,
+            'avg_width_cm': 15,
+            'n_seller_states': 1,
+            'purch_year': 2024,
+            'purch_month': 6,
+            'purch_dayofweek': 2,
+            'purch_hour': 14,
+            'purch_is_weekend': 0,
+            'purch_hour_sin': 0,
+            'purch_hour_cos': 1,
+            'est_lead_days': 7,
+            'n_categories': 1,
+            'mode_category_count': 1
+        }
+        return defaults.get(feature_name, 0)
     
-    # Ensure all features are present and in correct order
-    df = df[feature_names]
+    # Payment type features (binary)
+    elif feature_name in feature_metadata['paytype_feats']:
+        return 1 if feature_name == 'paytype_credit_card' else 0
+    
+    # Categorical features
+    elif feature_name in feature_metadata['categorical_feats']:
+        defaults = {
+            'mode_category': 'bed_bath_table',
+            'seller_state_mode': 'SP',
+            'customer_city': 'sao paulo',
+            'customer_state': 'SP'
+        }
+        return defaults.get(feature_name, 'unknown')
+    
+    return 0
+
+
+def ensure_correct_dtypes(df, feature_metadata):
+    """
+    Ensure dataframe has correct data types for all features
+    
+    Args:
+        df: Input dataframe
+        feature_metadata: Feature metadata dictionary
+    
+    Returns:
+        DataFrame: Dataframe with corrected types
+    """
+    # Convert numeric features
+    for col in feature_metadata['numeric_feats']:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+    
+    # Convert payment type features (binary 0/1)
+    for col in feature_metadata['paytype_feats']:
+        if col in df.columns:
+            df[col] = df[col].astype(int)
+    
+    # Convert categorical features to string
+    for col in feature_metadata['categorical_feats']:
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.lower()
     
     return df
 
 
-def create_example_order(scenario="typical"):
+def get_feature_ranges(feature_metadata):
     """
-    Create example order data for different scenarios
+    Get typical ranges for numeric features
     
     Args:
-        scenario: One of ['typical', 'high_risk', 'low_risk']
+        feature_metadata: Feature metadata dictionary
     
     Returns:
-        dict: Example order features
+        dict: Feature name to (min, max, default) mapping
     """
-    examples = {
-        "typical": {
-            "n_items": 2,
-            "n_sellers": 1,
-            "n_products": 2,
-            "sum_price": 150.0,
-            "sum_freight": 25.0,
-            "total_payment": 175.0,
-            "n_payment_records": 1,
-            "max_installments": 3,
-            "avg_weight_g": 2000.0,
-            "avg_length_cm": 30.0,
-            "avg_height_cm": 15.0,
-            "avg_width_cm": 20.0,
-            "n_seller_states": 1,
-            "purch_year": 2024,
-            "purch_month": 6,
-            "purch_dayofweek": 2,
-            "purch_hour": 14,
-            "purch_is_weekend": 0,
-            "purch_hour_sin": np.sin(2 * np.pi * 14 / 24),
-            "purch_hour_cos": np.cos(2 * np.pi * 14 / 24),
-            "est_lead_days": 7.0,
-            "n_categories": 1,
-            "mode_category_count": 2,
-            "paytype_boleto": 0,
-            "paytype_credit_card": 1,
-            "paytype_debit_card": 0,
-            "paytype_not_defined": 0,
-            "paytype_voucher": 0,
-            "mode_category": "electronics",
-            "seller_state_mode": "SP",
-            "customer_city": "sao paulo",
-            "customer_state": "SP"
+    ranges = {
+        'n_items': (1, 20, 1),
+        'n_sellers': (1, 10, 1),
+        'n_products': (1, 20, 1),
+        'sum_price': (10.0, 10000.0, 100.0),
+        'sum_freight': (5.0, 500.0, 20.0),
+        'total_payment': (15.0, 10500.0, 120.0),
+        'n_payment_records': (1, 10, 1),
+        'max_installments': (1, 24, 1),
+        'avg_weight_g': (50, 50000, 1000),
+        'avg_length_cm': (5, 100, 30),
+        'avg_height_cm': (2, 50, 10),
+        'avg_width_cm': (5, 80, 20),
+        'n_seller_states': (1, 5, 1),
+        'purch_year': (2016, 2025, 2024),
+        'purch_month': (1, 12, 6),
+        'purch_dayofweek': (0, 6, 2),
+        'purch_hour': (0, 23, 14),
+        'purch_is_weekend': (0, 1, 0),
+        'est_lead_days': (1, 60, 10),
+        'n_categories': (1, 10, 1),
+        'mode_category_count': (1, 20, 1)
+    }
+    return ranges
+
+
+def create_sample_scenarios():
+    """
+    Create example scenarios for demonstration
+    
+    Returns:
+        dict: Scenario name to input values mapping
+    """
+    scenarios = {
+        "Low Risk - Standard Order": {
+            'n_items': 1,
+            'n_sellers': 1,
+            'sum_price': 50.0,
+            'sum_freight': 10.0,
+            'est_lead_days': 5,
+            'customer_state': 'SP',
+            'seller_state_mode': 'SP',
+            'paytype_credit_card': 1,
+            'purch_hour': 14,
+            'purch_is_weekend': 0
         },
-        "high_risk": {
-            "n_items": 8,
-            "n_sellers": 4,
-            "n_products": 7,
-            "sum_price": 850.0,
-            "sum_freight": 120.0,
-            "total_payment": 970.0,
-            "n_payment_records": 2,
-            "max_installments": 12,
-            "avg_weight_g": 5500.0,
-            "avg_length_cm": 65.0,
-            "avg_height_cm": 45.0,
-            "avg_width_cm": 50.0,
-            "n_seller_states": 3,
-            "purch_year": 2024,
-            "purch_month": 12,
-            "purch_dayofweek": 6,
-            "purch_hour": 23,
-            "purch_is_weekend": 1,
-            "purch_hour_sin": np.sin(2 * np.pi * 23 / 24),
-            "purch_hour_cos": np.cos(2 * np.pi * 23 / 24),
-            "est_lead_days": 18.0,
-            "n_categories": 4,
-            "mode_category_count": 2,
-            "paytype_boleto": 1,
-            "paytype_credit_card": 0,
-            "paytype_debit_card": 0,
-            "paytype_not_defined": 0,
-            "paytype_voucher": 0,
-            "mode_category": "furniture_decor",
-            "seller_state_mode": "RJ",
-            "customer_city": "manaus",
-            "customer_state": "AM"
+        "Medium Risk - Multi-item": {
+            'n_items': 5,
+            'n_sellers': 2,
+            'sum_price': 300.0,
+            'sum_freight': 45.0,
+            'est_lead_days': 12,
+            'customer_state': 'RJ',
+            'seller_state_mode': 'SP',
+            'paytype_boleto': 1,
+            'purch_hour': 22,
+            'purch_is_weekend': 1
         },
-        "low_risk": {
-            "n_items": 1,
-            "n_sellers": 1,
-            "n_products": 1,
-            "sum_price": 45.0,
-            "sum_freight": 12.0,
-            "total_payment": 57.0,
-            "n_payment_records": 1,
-            "max_installments": 1,
-            "avg_weight_g": 500.0,
-            "avg_length_cm": 15.0,
-            "avg_height_cm": 8.0,
-            "avg_width_cm": 10.0,
-            "n_seller_states": 1,
-            "purch_year": 2024,
-            "purch_month": 3,
-            "purch_dayofweek": 1,
-            "purch_hour": 10,
-            "purch_is_weekend": 0,
-            "purch_hour_sin": np.sin(2 * np.pi * 10 / 24),
-            "purch_hour_cos": np.cos(2 * np.pi * 10 / 24),
-            "est_lead_days": 3.0,
-            "n_categories": 1,
-            "mode_category_count": 1,
-            "paytype_boleto": 0,
-            "paytype_credit_card": 1,
-            "paytype_debit_card": 0,
-            "paytype_not_defined": 0,
-            "paytype_voucher": 0,
-            "mode_category": "health_beauty",
-            "seller_state_mode": "SP",
-            "customer_city": "sao paulo",
-            "customer_state": "SP"
+        "High Risk - Complex Order": {
+            'n_items': 15,
+            'n_sellers': 5,
+            'sum_price': 1500.0,
+            'sum_freight': 200.0,
+            'est_lead_days': 25,
+            'customer_state': 'AM',
+            'seller_state_mode': 'RJ',
+            'paytype_voucher': 1,
+            'purch_hour': 3,
+            'purch_is_weekend': 1,
+            'n_seller_states': 4
         }
     }
-    
-    return examples.get(scenario, examples["typical"])
-
-
-def get_feature_descriptions():
-    """
-    Get human-readable descriptions for all features
-    
-    Returns:
-        dict: Feature descriptions
-    """
-    return {
-        # Order characteristics
-        "n_items": "Number of items in the order",
-        "n_sellers": "Number of different sellers",
-        "n_products": "Number of unique products",
-        "n_categories": "Number of product categories",
-        "mode_category_count": "Count of most frequent category",
-        
-        # Financial
-        "sum_price": "Total price of all items (R$)",
-        "sum_freight": "Total freight/shipping cost (R$)",
-        "total_payment": "Total payment amount (R$)",
-        "n_payment_records": "Number of payment transactions",
-        "max_installments": "Maximum number of installments",
-        
-        # Product dimensions
-        "avg_weight_g": "Average product weight (grams)",
-        "avg_length_cm": "Average product length (cm)",
-        "avg_height_cm": "Average product height (cm)",
-        "avg_width_cm": "Average product width (cm)",
-        
-        # Geographic
-        "n_seller_states": "Number of different seller states",
-        "seller_state_mode": "Most common seller state",
-        "customer_city": "Customer city",
-        "customer_state": "Customer state",
-        
-        # Temporal
-        "purch_year": "Purchase year",
-        "purch_month": "Purchase month (1-12)",
-        "purch_dayofweek": "Day of week (0=Mon, 6=Sun)",
-        "purch_hour": "Hour of purchase (0-23)",
-        "purch_is_weekend": "Weekend purchase (0=No, 1=Yes)",
-        "purch_hour_sin": "Hour sine encoding",
-        "purch_hour_cos": "Hour cosine encoding",
-        
-        # Logistics
-        "est_lead_days": "Estimated delivery lead time (days)",
-        "mode_category": "Most common product category",
-        
-        # Payment type (one-hot encoded)
-        "paytype_boleto": "Payment via Boleto",
-        "paytype_credit_card": "Payment via Credit Card",
-        "paytype_debit_card": "Payment via Debit Card",
-        "paytype_not_defined": "Payment type not defined",
-        "paytype_voucher": "Payment via Voucher"
-    }
+    return scenarios
 
 
 def calculate_temporal_features(purchase_datetime):
     """
-    Calculate temporal features from datetime
+    Calculate temporal features from purchase datetime
     
     Args:
         purchase_datetime: datetime object
@@ -245,11 +289,11 @@ def calculate_temporal_features(purchase_datetime):
     hour = purchase_datetime.hour
     
     return {
-        "purch_year": purchase_datetime.year,
-        "purch_month": purchase_datetime.month,
-        "purch_dayofweek": purchase_datetime.weekday(),
-        "purch_hour": hour,
-        "purch_is_weekend": 1 if purchase_datetime.weekday() >= 5 else 0,
-        "purch_hour_sin": np.sin(2 * np.pi * hour / 24),
-        "purch_hour_cos": np.cos(2 * np.pi * hour / 24)
+        'purch_year': purchase_datetime.year,
+        'purch_month': purchase_datetime.month,
+        'purch_dayofweek': purchase_datetime.weekday(),
+        'purch_hour': hour,
+        'purch_is_weekend': 1 if purchase_datetime.weekday() >= 5 else 0,
+        'purch_hour_sin': np.sin(2 * np.pi * hour / 24),
+        'purch_hour_cos': np.cos(2 * np.pi * hour / 24)
     }
