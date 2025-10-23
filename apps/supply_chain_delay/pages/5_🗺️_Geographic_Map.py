@@ -5,83 +5,126 @@ Visualize delay risk across different geographic regions
 
 import streamlit as st
 import pandas as pd
-import sys
-from pathlib import Path
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+from utils import (
+    load_model_artifacts,
+    load_metadata,
+    apply_custom_css,
+    show_page_header,
+    predict_delay,
+    prepare_features,
+    create_example_order
+)
 
-sys.path.append(str(Path(__file__).parent.parent))
-
-from config import *
-from utils.model_loader import load_model, load_metadata, batch_predict
-from utils.feature_engineering import create_sample_data
-
+# Page config
 st.set_page_config(page_title="Geographic Map", page_icon="🗺️", layout="wide")
+apply_custom_css()
 
-# Load resources
-@st.cache_resource
-def load_resources():
-    model = load_model(str(MODEL_PATH))
-    final_metadata = load_metadata(str(FINAL_METADATA_PATH))
-    feature_metadata = load_metadata(str(FEATURE_METADATA_PATH))
-    return model, final_metadata, feature_metadata
+# Load model
+model, final_metadata, feature_metadata, threshold = load_model_artifacts()
 
-model, final_metadata, feature_metadata = load_resources()
+# Header
+show_page_header(
+    title="Geographic Risk Distribution",
+    description="Visualize how delivery delay risk varies across different geographic regions",
+    icon="🗺️"
+)
 
-# Title
-st.title("🗺️ Geographic Risk Distribution")
-st.markdown("""
-Visualize how delivery delay risk varies across different geographic regions.
-Identify high-risk areas and optimize your logistics strategy accordingly.
-""")
+# Get risk bands from metadata
+risk_bands = {
+    'low': {'max': final_metadata['risk_bands']['low_max'], 'color': '#00CC96'},
+    'medium': {'max': final_metadata['risk_bands']['med_max'], 'color': '#FFA500'},
+    'high': {'max': 100, 'color': '#EF553B'}
+}
 
 # Data source selection
 st.markdown("### 📊 Data Source")
 
 data_source = st.radio(
     "Select data source:",
-    options=["Upload CSV", "Use Sample Data", "Use Batch Results"],
+    options=["Generate Sample Data", "Use Batch Results"],
     horizontal=True
 )
 
 df_to_analyze = None
 
-if data_source == "Upload CSV":
-    uploaded_file = st.file_uploader("Upload CSV file with geographic data", type=['csv'])
+if data_source == "Generate Sample Data":
+    st.info("Generate sample data to explore geographic patterns")
     
-    if uploaded_file:
-        try:
-            df = pd.read_csv(uploaded_file)
-            st.success(f"✅ Loaded {len(df)} orders")
-            
-            if 'probability' not in df.columns:
-                with st.spinner("Generating predictions..."):
-                    df_to_analyze = batch_predict(
-                        model, df, feature_metadata['feature_names'],
-                        OPTIMAL_THRESHOLD, RISK_BANDS
-                    )
-            else:
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        n_samples = st.slider("Number of samples", 20, 200, 100)
+    
+    with col2:
+        if st.button("🔄 Generate Sample Data", type="primary", use_container_width=True):
+            with st.spinner("Generating sample data..."):
+                # Generate sample orders across different states
+                brazilian_states = ['SP', 'RJ', 'MG', 'RS', 'PR', 'SC', 'BA', 'DF', 'ES', 'GO', 
+                                   'PE', 'CE', 'PA', 'AM', 'MA', 'RN', 'PB', 'AL', 'PI', 'SE']
+                
+                cities_by_state = {
+                    'SP': ['sao paulo', 'campinas', 'santos', 'sorocaba'],
+                    'RJ': ['rio de janeiro', 'niteroi', 'duque de caxias'],
+                    'MG': ['belo horizonte', 'uberlandia', 'contagem'],
+                    'AM': ['manaus', 'itacoatiara'],
+                    'BA': ['salvador', 'feira de santana'],
+                }
+                
+                sample_data = []
+                
+                for _ in range(n_samples):
+                    # Random state
+                    state = np.random.choice(brazilian_states)
+                    city = np.random.choice(cities_by_state.get(state, ['capital']))
+                    
+                    # Base scenario with variations
+                    base = create_example_order('typical')
+                    
+                    # Modify based on state (remote states have higher risk)
+                    if state in ['AM', 'RR', 'AP', 'AC', 'RO']:  # Amazon region
+                        base['est_lead_days'] = np.random.uniform(10, 20)
+                        base['sum_freight'] = np.random.uniform(50, 100)
+                    else:
+                        base['est_lead_days'] = np.random.uniform(3, 10)
+                        base['sum_freight'] = np.random.uniform(10, 40)
+                    
+                    base['customer_state'] = state
+                    base['customer_city'] = city
+                    base['seller_state_mode'] = np.random.choice(['SP', 'RJ', 'MG'])
+                    
+                    sample_data.append(base)
+                
+                # Create dataframe
+                df = pd.DataFrame(sample_data)
+                
+                # Make predictions
+                predictions_list = []
+                probabilities_list = []
+                risk_levels_list = []
+                
+                for idx, row in df.iterrows():
+                    features = prepare_features(row.to_dict(), feature_metadata['feature_names'])
+                    preds, probs, risks = predict_delay(model, features, threshold)
+                    predictions_list.append(preds[0])
+                    probabilities_list.append(probs[0])
+                    risk_levels_list.append(risks[0])
+                
+                df['prediction'] = predictions_list
+                df['probability'] = probabilities_list
+                df['risk_category'] = risk_levels_list
+                
                 df_to_analyze = df
-        
-        except Exception as e:
-            st.error(f"Error loading file: {str(e)}")
-
-elif data_source == "Use Sample Data":
-    if st.button("Generate Sample Data", type="primary"):
-        with st.spinner("Generating sample data..."):
-            sample_df = create_sample_data(n_samples=100)
-            df_to_analyze = batch_predict(
-                model, sample_df, feature_metadata['feature_names'],
-                OPTIMAL_THRESHOLD, RISK_BANDS
-            )
-            st.success(f"✅ Generated {len(df_to_analyze)} sample orders")
+                st.success(f"✅ Generated {len(df_to_analyze)} sample orders")
 
 elif data_source == "Use Batch Results":
-    if 'batch_results' in st.session_state:
-        df_to_analyze = st.session_state['batch_results']
+    if 'prediction_results' in st.session_state:
+        df_to_analyze = st.session_state['prediction_results']
         st.success(f"✅ Using {len(df_to_analyze)} orders from batch predictions")
     else:
-        st.warning("⚠️ No batch results found. Please run batch predictions first.")
+        st.warning("⚠️ No batch results found. Please run batch predictions first on the Batch Predictions page.")
 
 # Analysis section
 if df_to_analyze is not None and len(df_to_analyze) > 0:
@@ -103,7 +146,7 @@ if df_to_analyze is not None and len(df_to_analyze) > 0:
     # Aggregate by geography
     geo_stats = df_to_analyze.groupby(geo_level).agg({
         'probability': ['mean', 'median', 'std', 'count'],
-        'risk_category': lambda x: (x == 'high').sum()
+        'risk_category': lambda x: (x == 'High').sum()
     }).round(4)
     
     geo_stats.columns = ['Avg_Probability', 'Median_Probability', 'Std_Dev', 'Order_Count', 'High_Risk_Count']
@@ -117,18 +160,18 @@ if df_to_analyze is not None and len(df_to_analyze) > 0:
     # Sort by average probability
     geo_stats_sorted = geo_stats.sort_values('Avg_Probability', ascending=False)
     
-    # Create bar chart (since we don't have actual map coordinates)
+    # Create bar chart
     fig = go.Figure()
     
     # Determine colors based on risk
     colors = []
     for prob in geo_stats_sorted['Avg_Probability']:
-        if prob * 100 <= RISK_BANDS['low']['max']:
-            colors.append(RISK_BANDS['low']['color'])
-        elif prob * 100 <= RISK_BANDS['medium']['max']:
-            colors.append(RISK_BANDS['medium']['color'])
+        if prob * 100 <= risk_bands['low']['max']:
+            colors.append(risk_bands['low']['color'])
+        elif prob * 100 <= risk_bands['medium']['max']:
+            colors.append(risk_bands['medium']['color'])
         else:
-            colors.append(RISK_BANDS['high']['color'])
+            colors.append(risk_bands['high']['color'])
     
     fig.add_trace(go.Bar(
         x=geo_stats_sorted[geo_level],
@@ -147,8 +190,7 @@ if df_to_analyze is not None and len(df_to_analyze) > 0:
         yaxis_title="Average Delay Probability (%)",
         height=500,
         showlegend=False,
-        hovermode='x',
-        plot_bgcolor='rgba(240,240,240,0.5)'
+        hovermode='x'
     )
     
     st.plotly_chart(fig, use_container_width=True)
@@ -162,34 +204,32 @@ if df_to_analyze is not None and len(df_to_analyze) > 0:
         top_risk = geo_stats_sorted.head(5)
         
         for idx, row in top_risk.iterrows():
-            with st.container():
-                st.markdown(f"""
-                <div style='background-color: {RISK_BANDS['high']['color']}22; 
-                            padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem;
-                            border-left: 4px solid {RISK_BANDS['high']['color']};'>
-                    <strong>{row[geo_level]}</strong><br>
-                    Avg Risk: {row['Avg_Probability_Pct']:.1f}% | 
-                    Orders: {int(row['Order_Count'])} | 
-                    High Risk: {int(row['High_Risk_Count'])}
-                </div>
-                """, unsafe_allow_html=True)
+            st.markdown(f"""
+            <div style='background-color: {risk_bands['high']['color']}22; 
+                        padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem;
+                        border-left: 4px solid {risk_bands['high']['color']};'>
+                <strong>{row[geo_level]}</strong><br>
+                Avg Risk: {row['Avg_Probability_Pct']:.1f}% | 
+                Orders: {int(row['Order_Count'])} | 
+                High Risk: {int(row['High_Risk_Count'])}
+            </div>
+            """, unsafe_allow_html=True)
     
     with col2:
         st.markdown("### 🟢 Lowest Risk Regions")
         bottom_risk = geo_stats_sorted.tail(5)
         
         for idx, row in bottom_risk.iterrows():
-            with st.container():
-                st.markdown(f"""
-                <div style='background-color: {RISK_BANDS['low']['color']}22; 
-                            padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem;
-                            border-left: 4px solid {RISK_BANDS['low']['color']};'>
-                    <strong>{row[geo_level]}</strong><br>
-                    Avg Risk: {row['Avg_Probability_Pct']:.1f}% | 
-                    Orders: {int(row['Order_Count'])} | 
-                    High Risk: {int(row['High_Risk_Count'])}
-                </div>
-                """, unsafe_allow_html=True)
+            st.markdown(f"""
+            <div style='background-color: {risk_bands['low']['color']}22; 
+                        padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem;
+                        border-left: 4px solid {risk_bands['low']['color']};'>
+                <strong>{row[geo_level]}</strong><br>
+                Avg Risk: {row['Avg_Probability_Pct']:.1f}% | 
+                Orders: {int(row['Order_Count'])} | 
+                High Risk: {int(row['High_Risk_Count'])}
+            </div>
+            """, unsafe_allow_html=True)
     
     # Detailed statistics
     st.markdown("---")
@@ -206,7 +246,16 @@ if df_to_analyze is not None and len(df_to_analyze) > 0:
         'Median Prob', 'Std Dev', 'High Risk Orders', 'High Risk %'
     ]
     
-    st.dataframe(display_df, use_container_width=True, height=400)
+    st.dataframe(
+        display_df.style.format({
+            'Avg Risk (%)': '{:.1f}',
+            'Median Prob': '{:.4f}',
+            'Std Dev': '{:.4f}',
+            'High Risk %': '{:.1f}'
+        }),
+        use_container_width=True,
+        height=400
+    )
     
     # Key insights
     st.markdown("---")
@@ -327,3 +376,11 @@ else:
         - Resource allocation decisions
         - Risk mitigation strategies
         """)
+
+# Footer
+st.markdown("---")
+st.markdown("""
+<div style="text-align: center; color: gray;">
+    <p>🗺️ Use geographic insights to optimize your logistics network and reduce regional delays</p>
+</div>
+""", unsafe_allow_html=True)
