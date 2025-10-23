@@ -252,6 +252,5 @@ with st.sidebar:
                 st.write(f"{lib}",
     getattr(m, "__version__", "unknown"))
             except  Exception as e:
-                st.write(f"{lib}", f"not
-    importable ({e})")
+                st.write(f"{lib}", f"not importable ({e})")
                     
