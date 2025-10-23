@@ -50,6 +50,17 @@ def prepare_features(order_data, feature_metadata):
     """Alias for prepare_single_prediction_input"""
     return prepare_single_prediction_input(order_data, feature_metadata)
 
+def create_example_order(scenario_name=None):
+    """
+    Alias for create_sample_scenarios
+    If scenario_name is provided, returns that specific scenario
+    Otherwise returns all scenarios
+    """
+    scenarios = create_sample_scenarios()
+    if scenario_name:
+        return scenarios.get(scenario_name)
+    return scenarios
+
 __all__ = [
     # Model functions
     'load_model_artifacts',
@@ -89,5 +100,6 @@ __all__ = [
     
     # Aliases for backward compatibility
     'predict_delay',
-    'prepare_features'
+    'prepare_features',
+    'create_example_order'
 ]
