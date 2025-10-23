@@ -1,7 +1,7 @@
 # Core ML & Data Science
 pandas
 numpy
-scikit-learn
+scikit-learn==1.6.1
 lightgbm
 
 # Streamlit & Visualization
@@ -11,7 +11,7 @@ matplotlib
 seaborn
 
 # SHAP for model explainability
-shap
+shap==0.44.1
 
 # PDF Generation
 reportlab
