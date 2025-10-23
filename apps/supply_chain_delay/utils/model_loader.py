@@ -1,6 +1,5 @@
 """
-Model Loading and Prediction Module
-Handles all ML model operations with caching for performance
+Model loading and prediction utilities
 """
 
 import json
@@ -14,7 +13,7 @@ from pathlib import Path
 @st.cache_resource
 def load_model_artifacts():
     """
-    Load model, metadata, and configurations with caching
+    Load model, metadata, and threshold with caching for performance
     
     Returns:
         tuple: (model, final_metadata, feature_metadata, threshold)
@@ -22,7 +21,7 @@ def load_model_artifacts():
     try:
         artifacts_path = Path("artifacts")
         
-        # Load the trained model
+        # Load model
         with open(artifacts_path / "best_model_lightgbm.pkl", "rb") as f:
             model = pickle.load(f)
         
@@ -34,9 +33,8 @@ def load_model_artifacts():
         with open(artifacts_path / "feature_metadata.json", "r") as f:
             feature_metadata = json.load(f)
         
-        # Load optimal threshold
-        with open(artifacts_path / "optimal_threshold_lightgbm.txt", "r") as f:
-            threshold = float(f.read().strip())
+        # Load threshold
+        threshold = final_metadata.get("optimal_threshold", 0.669271)
         
         return model, final_metadata, feature_metadata, threshold
     
@@ -45,82 +43,145 @@ def load_model_artifacts():
         st.stop()
 
 
-def predict_delay(model, features_df, threshold):
+def load_metadata():
     """
-    Make predictions with the model
+    Load only metadata files (lighter weight for non-prediction pages)
+    
+    Returns:
+        tuple: (final_metadata, feature_metadata)
+    """
+    try:
+        artifacts_path = Path("artifacts")
+        
+        with open(artifacts_path / "final_metadata.json", "r") as f:
+            final_metadata = json.load(f)
+        
+        with open(artifacts_path / "feature_metadata.json", "r") as f:
+            feature_metadata = json.load(f)
+        
+        return final_metadata, feature_metadata
+    
+    except Exception as e:
+        st.error(f"Error loading metadata: {str(e)}")
+        st.stop()
+
+
+def predict_delay_risk(model, input_data, threshold):
+    """
+    Make prediction and return probability and risk category
     
     Args:
         model: Trained LightGBM model
-        features_df: DataFrame with features
+        input_data: DataFrame with features
         threshold: Classification threshold
     
     Returns:
-        tuple: (predictions, probabilities, risk_level)
+        tuple: (probability, risk_category, is_high_risk)
     """
     try:
-        # Get probability predictions
-        probabilities = model.predict_proba(features_df)[:, 1]
+        # Get probability of delay
+        prob = model.predict_proba(input_data)[:, 1]
         
-        # Apply threshold for binary prediction
-        predictions = (probabilities >= threshold).astype(int)
+        # Convert to percentage
+        prob_pct = prob * 100
         
-        # Determine risk level
-        risk_levels = []
-        for prob in probabilities:
-            prob_pct = prob * 100
-            if prob_pct <= 30:
-                risk_levels.append("Low")
-            elif prob_pct <= 67:
-                risk_levels.append("Medium")
-            else:
-                risk_levels.append("High")
+        # Determine risk category
+        risk_category = get_risk_category(prob_pct[0])
         
-        return predictions, probabilities, risk_levels
+        # Binary classification based on threshold
+        is_high_risk = prob[0] >= threshold
+        
+        return prob_pct[0], risk_category, is_high_risk
     
     except Exception as e:
-        st.error(f"Error making predictions: {str(e)}")
+        st.error(f"Prediction error: {str(e)}")
         return None, None, None
 
 
-def get_model_performance():
+def get_risk_category(probability_pct):
     """
-    Get model performance metrics
+    Categorize risk level based on probability percentage
+    
+    Args:
+        probability_pct: Probability as percentage (0-100)
     
     Returns:
-        dict: Performance metrics
+        str: Risk category ('Low', 'Medium', or 'High')
     """
-    _, final_metadata, _, _ = load_model_artifacts()
+    if probability_pct <= 30:
+        return "Low"
+    elif probability_pct <= 67:
+        return "Medium"
+    else:
+        return "High"
+
+
+def get_risk_color(risk_category):
+    """
+    Get color for risk category
     
-    return {
-        "AUC-ROC": final_metadata["best_model_auc"],
-        "Precision": final_metadata["best_model_precision"],
-        "Recall": final_metadata["best_model_recall"],
-        "F1-Score": final_metadata["best_model_f1"]
+    Args:
+        risk_category: Risk level ('Low', 'Medium', 'High')
+    
+    Returns:
+        str: Hex color code
+    """
+    colors = {
+        "Low": "#00CC96",      # Green
+        "Medium": "#FFA500",   # Orange
+        "High": "#EF553B"      # Red
     }
+    return colors.get(risk_category, "#888888")
 
 
-def get_feature_names():
+def batch_predict(model, input_data, threshold, final_metadata):
     """
-    Get list of feature names
+    Make predictions for batch of orders
+    
+    Args:
+        model: Trained model
+        input_data: DataFrame with multiple rows
+        threshold: Classification threshold
+        final_metadata: Metadata dict with risk band info
     
     Returns:
-        list: Feature names
+        DataFrame: Input data with predictions added
     """
-    _, _, feature_metadata, _ = load_model_artifacts()
-    return feature_metadata["feature_names"]
+    try:
+        # Get probabilities
+        probs = model.predict_proba(input_data)[:, 1]
+        probs_pct = probs * 100
+        
+        # Create results dataframe
+        results = input_data.copy()
+        results['delay_probability'] = probs_pct
+        results['risk_category'] = [get_risk_category(p) for p in probs_pct]
+        results['high_risk'] = probs >= threshold
+        
+        return results
+    
+    except Exception as e:
+        st.error(f"Batch prediction error: {str(e)}")
+        return None
 
 
-def get_feature_types():
+def get_model_performance(final_metadata):
     """
-    Get feature type mappings
+    Extract and format model performance metrics
+    
+    Args:
+        final_metadata: Dictionary with model metrics
     
     Returns:
-        dict: Feature type categories
+        dict: Formatted performance metrics
     """
-    _, _, feature_metadata, _ = load_model_artifacts()
-    
     return {
-        "numeric": feature_metadata["numeric_feats"],
-        "payment_types": feature_metadata["paytype_feats"],
-        "categorical": feature_metadata["categorical_feats"]
+        'AUC-ROC': f"{final_metadata['best_model_auc']:.2%}",
+        'Precision': f"{final_metadata['best_model_precision']:.2%}",
+        'Recall': f"{final_metadata['best_model_recall']:.2%}",
+        'F1-Score': f"{final_metadata['best_model_f1']:.2%}",
+        'Threshold': f"{final_metadata['optimal_threshold']:.4f}",
+        'Training Samples': f"{final_metadata['n_samples_train']:,}",
+        'Test Samples': f"{final_metadata['n_samples_test']:,}",
+        'Training Date': final_metadata['training_date']
     }
