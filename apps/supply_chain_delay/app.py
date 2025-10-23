@@ -1,6 +1,6 @@
 """
-Supply Chain Delay Prediction System
-Main Dashboard and Application Entry Point
+Supply Chain Delay Prediction - Main Dashboard
+A machine learning application for predicting delivery delays in e-commerce supply chains
 """
 
 import streamlit as st
@@ -8,18 +8,17 @@ import pandas as pd
 import numpy as np
 from utils import (
     load_model_artifacts,
-    get_model_performance,
+    load_metadata,
     apply_custom_css,
-    show_page_header,
-    create_three_column_layout,
-    display_info_box,
     get_risk_color,
-    get_risk_icon
+    create_metrics_cards,
+    display_info_banner
 )
+from utils.model_loader import get_model_performance
 
 # Page configuration
 st.set_page_config(
-    page_title="Supply Chain Delay Predictor",
+    page_title="Supply Chain Delay Prediction",
     page_icon="📦",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -28,232 +27,215 @@ st.set_page_config(
 # Apply custom styling
 apply_custom_css()
 
-# Load model artifacts (cached)
-model, final_metadata, feature_metadata, threshold = load_model_artifacts()
+# Load metadata (lightweight for homepage)
+final_metadata, feature_metadata = load_metadata()
 
 # Header
-show_page_header(
-    title="Supply Chain Delay Prediction System",
-    description="AI-powered tool to predict and prevent delivery delays in e-commerce supply chains",
-    icon="📦"
-)
+st.title("📦 Supply Chain Delay Prediction System")
+st.markdown("### Predict and prevent delivery delays with machine learning")
 
-# Main content
-st.markdown("""
-### Welcome to the Supply Chain Delay Prediction System
+# Introduction section
+with st.container():
+    col1, col2, col3 = st.columns([2, 1, 1])
+    
+    with col1:
+        st.markdown("""
+        Welcome to the **Supply Chain Delay Prediction System**! This application uses 
+        advanced machine learning to predict the likelihood of delivery delays in your 
+        e-commerce orders.
+        
+        #### 🎯 Key Features:
+        - **Real-time Predictions**: Get instant risk assessments for orders
+        - **Batch Processing**: Analyze multiple orders simultaneously
+        - **Visual Insights**: Interactive charts and geographic analysis
+        - **Actionable Reports**: Download detailed prediction reports
+        """)
+    
+    with col2:
+        st.metric(
+            label="Model Accuracy (AUC)",
+            value=f"{final_metadata['best_model_auc']:.1%}"
+        )
+        st.metric(
+            label="Features Used",
+            value=final_metadata['n_features']
+        )
+    
+    with col3:
+        st.metric(
+            label="Training Samples",
+            value=f"{final_metadata['n_samples_train']:,}"
+        )
+        st.metric(
+            label="Model Type",
+            value=final_metadata['best_model']
+        )
 
-This intelligent system uses machine learning to predict the likelihood of delivery delays 
-in e-commerce orders. By analyzing 32 different features including order characteristics, 
-geographic data, and temporal patterns, the system provides actionable insights to help 
-optimize your supply chain operations.
-""")
+st.divider()
 
-st.markdown("---")
+# Model Performance Section
+st.subheader("📊 Model Performance Metrics")
 
-# Key Metrics Overview
-st.subheader("📊 System Overview")
+performance = get_model_performance(final_metadata)
 
 col1, col2, col3, col4 = st.columns(4)
-
 with col1:
-    st.metric(
-        label="Model AUC-ROC",
-        value=f"{final_metadata['best_model_auc']:.3f}",
-        help="Area Under the ROC Curve - measures model discrimination ability"
-    )
-
+    st.metric("AUC-ROC", performance['AUC-ROC'])
 with col2:
-    st.metric(
-        label="Precision",
-        value=f"{final_metadata['best_model_precision']:.3f}",
-        help="Proportion of predicted delays that are actual delays"
-    )
-
+    st.metric("Precision", performance['Precision'])
 with col3:
-    st.metric(
-        label="Recall",
-        value=f"{final_metadata['best_model_recall']:.3f}",
-        help="Proportion of actual delays that are correctly predicted"
-    )
-
+    st.metric("Recall", performance['Recall'])
 with col4:
-    st.metric(
-        label="F1-Score",
-        value=f"{final_metadata['best_model_f1']:.3f}",
-        help="Harmonic mean of precision and recall"
-    )
+    st.metric("F1-Score", performance['F1-Score'])
 
-st.markdown("---")
+st.divider()
 
-# Feature sections
-col1, col2 = st.columns(2)
-
-with col1:
-    st.subheader("🎯 Key Features")
-    st.markdown("""
-    - **Single Order Prediction**: Predict delay risk for individual orders with detailed explanations
-    - **Batch Processing**: Upload CSV files to predict delays for multiple orders at once
-    - **Interactive Scenarios**: Explore pre-built scenarios to understand risk factors
-    - **Geographic Analysis**: Visualize delay patterns across Brazilian states
-    - **Temporal Trends**: Analyze how delays vary over time
-    - **SHAP Explanations**: Understand which features contribute to each prediction
-    """)
-
-with col2:
-    st.subheader("📈 Model Information")
-    st.markdown(f"""
-    - **Algorithm**: {final_metadata['best_model']} (Gradient Boosting)
-    - **Features**: {final_metadata['n_features']} predictive features
-    - **Training Samples**: {final_metadata['n_samples_train']:,}
-    - **Test Samples**: {final_metadata['n_samples_test']:,}
-    - **Training Date**: {final_metadata['training_date']}
-    - **Optimal Threshold**: {threshold*100:.1f}%
-    """)
-
-st.markdown("---")
-
-# Risk Level Explanation
-st.subheader("🚦 Risk Level Definitions")
+# Risk Categories Explanation
+st.subheader("🎨 Risk Categories")
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.markdown(f"""
-    <div style="background-color: {get_risk_color('Low')}20; padding: 20px; border-radius: 10px; border-left: 5px solid {get_risk_color('Low')}">
-        <h3>{get_risk_icon('Low')} Low Risk (0-30%)</h3>
-        <p>Orders with low probability of delay. Standard processing recommended.</p>
+    st.markdown("""
+    <div style="background-color: #E8F8F5; padding: 1.5rem; border-radius: 0.5rem; border-left: 4px solid #00CC96;">
+        <h4 style="color: #00CC96; margin-top: 0;">🟢 Low Risk (0-30%)</h4>
+        <p>Orders with low probability of delay. Standard monitoring recommended.</p>
         <ul>
-            <li>Proceed normally</li>
-            <li>Standard monitoring</li>
-            <li>Regular fulfillment</li>
+            <li>Typical delivery expected</li>
+            <li>Minimal intervention needed</li>
+            <li>Standard customer communication</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
 
 with col2:
-    st.markdown(f"""
-    <div style="background-color: {get_risk_color('Medium')}20; padding: 20px; border-radius: 10px; border-left: 5px solid {get_risk_color('Medium')}">
-        <h3>{get_risk_icon('Medium')} Medium Risk (30-67%)</h3>
-        <p>Orders requiring enhanced attention and monitoring.</p>
+    st.markdown("""
+    <div style="background-color: #FFF4E6; padding: 1.5rem; border-radius: 0.5rem; border-left: 4px solid #FFA500;">
+        <h4 style="color: #FFA500; margin-top: 0;">🟡 Medium Risk (30-67%)</h4>
+        <p>Orders requiring attention. Enhanced monitoring advised.</p>
         <ul>
-            <li>Increased monitoring</li>
-            <li>Verify inventory</li>
-            <li>Check logistics</li>
+            <li>Potential delivery issues</li>
+            <li>Proactive customer updates</li>
+            <li>Review logistics planning</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
 
 with col3:
-    st.markdown(f"""
-    <div style="background-color: {get_risk_color('High')}20; padding: 20px; border-radius: 10px; border-left: 5px solid {get_risk_color('High')}">
-        <h3>{get_risk_icon('High')} High Risk (67-100%)</h3>
+    st.markdown("""
+    <div style="background-color: #FADBD8; padding: 1.5rem; border-radius: 0.5rem; border-left: 4px solid #EF553B;">
+        <h4 style="color: #EF553B; margin-top: 0;">🔴 High Risk (67-100%)</h4>
         <p>Orders at high risk of delay. Immediate action required.</p>
         <ul>
-            <li>Immediate review</li>
-            <li>Proactive communication</li>
-            <li>Consider alternatives</li>
+            <li>Likely delivery delays</li>
+            <li>Immediate intervention needed</li>
+            <li>Alternative logistics options</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
 
-st.markdown("---")
+st.divider()
 
-# Getting Started
-st.subheader("🚀 Getting Started")
+# Feature Importance Overview
+st.subheader("📈 Key Factors Affecting Delivery")
 
-display_info_box(
-    title="Quick Start Guide",
-    content="""
-    1. **Single Prediction**: Go to '📊 Single Prediction' to predict delay risk for one order
-    2. **Example Scenarios**: Visit '🎯 Example Scenarios' to see pre-built examples
-    3. **Batch Processing**: Use '📦 Batch Predictions' to analyze multiple orders from CSV
-    4. **Analyze Trends**: Explore '📈 Time Trends' and '🗺️ Geographic Map' for insights
-    """,
-    box_type="info"
-)
+col1, col2 = st.columns([1, 1])
 
-st.markdown("---")
-
-# Dataset Information
-with st.expander("📋 Dataset & Feature Information"):
+with col1:
     st.markdown("""
-    ### Feature Categories
-    
-    **Order Characteristics** (9 features)
-    - Number of items, sellers, products, and categories
-    - Product dimensions (weight, length, height, width)
-    - Category information
-    
-    **Financial Features** (5 features)
-    - Sum of prices and freight costs
-    - Total payment amount
-    - Number of payment records
-    - Maximum installments
-    
-    **Geographic Features** (4 features)
-    - Customer city and state
-    - Seller state mode
-    - Number of seller states
-    
-    **Temporal Features** (9 features)
-    - Purchase year, month, day of week, hour
-    - Weekend indicator
-    - Cyclical time encodings (sine/cosine)
-    - Estimated lead days
-    
-    **Payment Type Features** (5 features)
-    - Boleto, Credit Card, Debit Card, Voucher, Not Defined
-    """)
-    
-    st.markdown(f"""
-    ### Target Distribution
-    - **On-Time Deliveries**: {feature_metadata['target_distribution']['on_time']:,} ({feature_metadata['target_distribution']['on_time']/feature_metadata['n_samples']*100:.1f}%)
-    - **Late Deliveries**: {feature_metadata['target_distribution']['late']:,} ({feature_metadata['target_distribution']['late']/feature_metadata['n_samples']*100:.1f}%)
-    - **Imbalance Ratio**: {feature_metadata['target_distribution']['imbalance_ratio']:.1f}:1
+    #### Order Characteristics
+    - **Number of items**: More items increase complexity
+    - **Multiple sellers**: Coordination challenges
+    - **Order value**: High-value orders may need special handling
+    - **Product dimensions**: Large items face logistics constraints
     """)
 
-st.markdown("---")
+with col2:
+    st.markdown("""
+    #### Geographic & Temporal Factors
+    - **Customer location**: Remote areas have higher risk
+    - **Seller location**: Distance affects delivery time
+    - **Purchase timing**: Weekend/late-night orders
+    - **Estimated lead time**: Longer estimates indicate complexity
+    """)
+
+st.divider()
+
+# Navigation Guide
+st.subheader("🗺️ Getting Started")
+
+st.markdown("""
+Choose from the following pages in the sidebar to get started:
+
+1. **🎯 Example Scenarios** - Explore pre-configured scenarios to understand the model
+2. **📊 Single Prediction** - Make predictions for individual orders with detailed insights
+3. **📦 Batch Predictions** - Upload and analyze multiple orders at once
+4. **📈 Time Trends** - Analyze how delay risk varies over time
+5. **🗺️ Geographic Map** - Visualize risk patterns across different locations
+
+---
+
+*Select a page from the sidebar to begin!*
+""")
 
 # Footer
-st.markdown("""
-<div style="text-align: center; color: gray; padding: 20px;">
-    <p>📦 Supply Chain Delay Prediction System | Powered by LightGBM & SHAP</p>
-    <p><small>Navigate using the sidebar to access different features →</small></p>
-</div>
-""", unsafe_allow_html=True)
+st.markdown("---")
+col1, col2, col3 = st.columns(3)
 
-# Sidebar
+with col1:
+    st.markdown("""
+    **📚 Documentation**
+    - Model trained on Brazilian e-commerce data
+    - Uses LightGBM gradient boosting
+    - Optimized threshold for business needs
+    """)
+
+with col2:
+    st.markdown(f"""
+    **📅 Model Information**
+    - Training Date: {final_metadata['training_date']}
+    - Optimal Threshold: {final_metadata['optimal_threshold']:.4f}
+    - Total Features: {final_metadata['n_features']}
+    """)
+
+with col3:
+    st.markdown("""
+    **💡 Tips**
+    - Start with Example Scenarios to understand the model
+    - Use Single Prediction for detailed analysis
+    - Batch mode for operational efficiency
+    """)
+
+# Sidebar information
 with st.sidebar:
-    st.image("https://via.placeholder.com/300x100/FF6B6B/FFFFFF?text=Supply+Chain+AI", use_container_width=True)
-    st.markdown("---")
+    st.header("ℹ️ About")
     
-    st.markdown("### 📍 Navigation")
     st.markdown("""
-    Use the pages above to:
-    - 🎯 View example scenarios
-    - 📊 Make single predictions
-    - 📦 Process batch predictions
-    - 📈 Analyze time trends
-    - 🗺️ View geographic patterns
+    This application predicts the likelihood of delivery delays 
+    in e-commerce supply chains using machine learning.
+    
+    **Developed by:** Data Science Team  
+    **Model Version:** 1.0  
+    **Last Updated:** Oct 2025
     """)
     
-    st.markdown("---")
+    st.divider()
     
-    st.markdown("### ℹ️ About")
-    st.info("""
-    This system predicts supply chain delays using machine learning 
-    trained on Brazilian e-commerce data.
-    
-    **Model**: LightGBM  
-    **Features**: 32  
-    **AUC-ROC**: 0.789
+    st.subheader("🎯 Quick Stats")
+    st.info(f"""
+    - **Total Features:** {feature_metadata['n_features']}
+    - **Training Samples:** {feature_metadata['n_samples']:,}
+    - **Imbalance Ratio:** {feature_metadata['target_distribution']['imbalance_ratio']:.1f}:1
     """)
     
-    st.markdown("---")
+    st.divider()
     
-    st.markdown("### 🔗 Resources")
-    st.markdown("""
-    - [Documentation](#)
-    - [API Guide](#)
-    - [Contact Support](#)
+    st.subheader("📊 Target Distribution")
+    on_time = feature_metadata['target_distribution']['on_time']
+    late = feature_metadata['target_distribution']['late']
+    total = on_time + late
+    
+    st.markdown(f"""
+    - **On-Time Deliveries:** {on_time:,} ({on_time/total*100:.1f}%)
+    - **Late Deliveries:** {late:,} ({late/total*100:.1f}%)
     """)
