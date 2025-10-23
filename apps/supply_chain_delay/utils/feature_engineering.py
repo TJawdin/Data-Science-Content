@@ -229,50 +229,151 @@ def get_feature_ranges(feature_metadata):
 
 def create_sample_scenarios():
     """
-    Create example scenarios for demonstration
+    Create complete example scenarios with ALL required features
     
     Returns:
-        dict: Scenario name to input values mapping
+        dict: Scenario name to complete input values mapping
     """
     scenarios = {
-        "Low Risk - Standard Order": {
+        'low_risk': {
+            # Order characteristics - simple, single item
             'n_items': 1,
             'n_sellers': 1,
-            'sum_price': 50.0,
-            'sum_freight': 10.0,
-            'est_lead_days': 5,
+            'n_products': 1,
+            'n_categories': 1,
+            'mode_category_count': 1,
+            'mode_category': 'health_beauty',
+            
+            # Financial - low value, simple payment
+            'sum_price': 45.0,
+            'sum_freight': 12.0,
+            'total_payment': 57.0,
+            'n_payment_records': 1,
+            'max_installments': 1,
+            
+            # Dimensions - small, lightweight
+            'avg_weight_g': 500.0,
+            'avg_length_cm': 15.0,
+            'avg_height_cm': 8.0,
+            'avg_width_cm': 10.0,
+            
+            # Geographic - same state, major city
+            'customer_city': 'sao paulo',
             'customer_state': 'SP',
             'seller_state_mode': 'SP',
+            'n_seller_states': 1,
+            
+            # Temporal - weekday, business hours
+            'purch_year': 2024,
+            'purch_month': 6,
+            'purch_dayofweek': 2,  # Wednesday
+            'purch_hour': 14,  # 2 PM
+            'purch_is_weekend': 0,
+            'purch_hour_sin': np.sin(2 * np.pi * 14 / 24),
+            'purch_hour_cos': np.cos(2 * np.pi * 14 / 24),
+            'est_lead_days': 3.0,
+            
+            # Payment type - credit card (most common, fastest)
+            'paytype_boleto': 0,
             'paytype_credit_card': 1,
-            'purch_hour': 14,
-            'purch_is_weekend': 0
+            'paytype_debit_card': 0,
+            'paytype_not_defined': 0,
+            'paytype_voucher': 0
         },
-        "Medium Risk - Multi-item": {
-            'n_items': 5,
-            'n_sellers': 2,
-            'sum_price': 300.0,
-            'sum_freight': 45.0,
-            'est_lead_days': 12,
-            'customer_state': 'RJ',
+        
+        'typical': {
+            # Order characteristics - moderate complexity
+            'n_items': 2,
+            'n_sellers': 1,
+            'n_products': 2,
+            'n_categories': 1,
+            'mode_category_count': 2,
+            'mode_category': 'electronics',
+            
+            # Financial - moderate value
+            'sum_price': 150.0,
+            'sum_freight': 25.0,
+            'total_payment': 175.0,
+            'n_payment_records': 1,
+            'max_installments': 3,
+            
+            # Dimensions - medium size
+            'avg_weight_g': 2000.0,
+            'avg_length_cm': 30.0,
+            'avg_height_cm': 15.0,
+            'avg_width_cm': 20.0,
+            
+            # Geographic - same or nearby state
+            'customer_city': 'campinas',
+            'customer_state': 'SP',
             'seller_state_mode': 'SP',
-            'paytype_boleto': 1,
-            'purch_hour': 22,
-            'purch_is_weekend': 1
+            'n_seller_states': 1,
+            
+            # Temporal - weekday, normal hours
+            'purch_year': 2024,
+            'purch_month': 6,
+            'purch_dayofweek': 1,  # Tuesday
+            'purch_hour': 18,  # 6 PM
+            'purch_is_weekend': 0,
+            'purch_hour_sin': np.sin(2 * np.pi * 18 / 24),
+            'purch_hour_cos': np.cos(2 * np.pi * 18 / 24),
+            'est_lead_days': 7.0,
+            
+            # Payment type - credit card with installments
+            'paytype_boleto': 0,
+            'paytype_credit_card': 1,
+            'paytype_debit_card': 0,
+            'paytype_not_defined': 0,
+            'paytype_voucher': 0
         },
-        "High Risk - Complex Order": {
-            'n_items': 15,
-            'n_sellers': 5,
-            'sum_price': 1500.0,
-            'sum_freight': 200.0,
-            'est_lead_days': 25,
-            'customer_state': 'AM',
-            'seller_state_mode': 'RJ',
-            'paytype_voucher': 1,
-            'purch_hour': 3,
+        
+        'high_risk': {
+            # Order characteristics - complex, multiple sellers
+            'n_items': 5,
+            'n_sellers': 3,
+            'n_products': 4,
+            'n_categories': 3,
+            'mode_category_count': 2,
+            'mode_category': 'furniture_decor',
+            
+            # Financial - high value, installments
+            'sum_price': 600.0,
+            'sum_freight': 80.0,
+            'total_payment': 680.0,
+            'n_payment_records': 2,
+            'max_installments': 10,
+            
+            # Dimensions - large, heavy items
+            'avg_weight_g': 4000.0,
+            'avg_length_cm': 50.0,
+            'avg_height_cm': 30.0,
+            'avg_width_cm': 40.0,
+            
+            # Geographic - cross-country, remote area
+            'customer_city': 'manaus',
+            'customer_state': 'AM',  # Amazon region - remote
+            'seller_state_mode': 'SP',  # São Paulo - far away
+            'n_seller_states': 2,
+            
+            # Temporal - weekend, late night
+            'purch_year': 2024,
+            'purch_month': 12,  # Holiday season
+            'purch_dayofweek': 6,  # Sunday
+            'purch_hour': 23,  # 11 PM
             'purch_is_weekend': 1,
-            'n_seller_states': 4
+            'purch_hour_sin': np.sin(2 * np.pi * 23 / 24),
+            'purch_hour_cos': np.cos(2 * np.pi * 23 / 24),
+            'est_lead_days': 15.0,
+            
+            # Payment type - boleto (slower processing)
+            'paytype_boleto': 1,
+            'paytype_credit_card': 0,
+            'paytype_debit_card': 0,
+            'paytype_not_defined': 0,
+            'paytype_voucher': 0
         }
     }
+    
     return scenarios
 
 
