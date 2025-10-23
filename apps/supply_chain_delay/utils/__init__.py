@@ -41,6 +41,15 @@ def display_info_banner(title, message, icon="ℹ️"):
     import streamlit as st
     st.info(f"{icon} **{title}**: {message}")
 
+# Alias functions for backward compatibility
+def predict_delay(model, input_data, threshold):
+    """Alias for predict_delay_risk"""
+    return predict_delay_risk(model, input_data, threshold)
+
+def prepare_features(order_data, feature_metadata):
+    """Alias for prepare_single_prediction_input"""
+    return prepare_single_prediction_input(order_data, feature_metadata)
+
 __all__ = [
     # Model functions
     'load_model_artifacts',
@@ -76,5 +85,9 @@ __all__ = [
     'generate_batch_report',
     
     # Helper functions
-    'display_info_banner'
+    'display_info_banner',
+    
+    # Aliases for backward compatibility
+    'predict_delay',
+    'prepare_features'
 ]
