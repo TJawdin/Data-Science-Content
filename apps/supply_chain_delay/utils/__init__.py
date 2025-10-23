@@ -6,7 +6,8 @@ from .model_loader import (
     load_metadata,
     predict_delay_risk,
     get_risk_category,
-    get_risk_color
+    get_risk_color,
+    get_model_performance
 )
 from .feature_engineering import (
     prepare_single_prediction_input,
@@ -47,6 +48,7 @@ __all__ = [
     'predict_delay_risk',
     'get_risk_category',
     'get_risk_color',
+    'get_model_performance',
     
     # Feature engineering
     'prepare_single_prediction_input',
