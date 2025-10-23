@@ -25,7 +25,7 @@ def load_model_artifacts():
         artifacts_path = current_dir / "artifacts"
         
         # Load model with compatibility fix for different Python versions
-        model_path = artifacts_path / "best_pipeline_LightGBM.joblib"
+        model_path = artifacts_path / "best_model_LightGBM.pkl"
         try:
             # Try normal pickle load first
             with open(model_path, "rb") as f:
