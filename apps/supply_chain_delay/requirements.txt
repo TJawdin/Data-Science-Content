@@ -1,22 +1,22 @@
 # Core ML & Data Science
-pandas
-numpy
+pandas==2.2.2
+numpy==2.0.2
 scikit-learn==1.6.1
-lightgbm
+lightgbm==4.6.0
 
 # Streamlit & Visualization
 streamlit
 plotly
-matplotlib
+matplotlib==3.10.0
 seaborn
 
 # SHAP for model explainability
-shap==0.44.1
+shap==0.49.1
 
 # PDF Generation
 reportlab
 pypdf2
 
 # Additional utilities
-joblib
+joblib==1.5.2
 pillow
