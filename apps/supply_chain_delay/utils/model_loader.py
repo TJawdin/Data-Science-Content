@@ -1,99 +1,126 @@
-import pickle
-import json
-import numpy as np
-import pandas as pd
-from pathlib import Path
-import streamlit as st
+"""
+Model Loading and Prediction Module
+Handles all ML model operations with caching for performance
+"""
 
-class ModelLoader:
-    def __init__(self, artifacts_path="./artifacts"):
-        self.artifacts_path = Path(artifacts_path)
-        self.model = None
-        self.metadata = None
-        self.feature_metadata = None
-        self.optimal_threshold = None
-        self.risk_bands = None
-        
-    @st.cache_resource
-    def load_model(_self):
-        """Load the LightGBM model"""
-        try:
-            model_path = _self.artifacts_path / "best_model_lightgbm.pkl"
-            with open(model_path, 'rb') as f:
-                _self.model = pickle.load(f)
-            return _self.model
-        except Exception as e:
-            st.error(f"Error loading model: {str(e)}")
-            return None
+import json
+import pickle
+import streamlit as st
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+
+@st.cache_resource
+def load_model_artifacts():
+    """
+    Load model, metadata, and configurations with caching
     
-    @st.cache_resource
-    def load_metadata(_self):
-        """Load model metadata"""
-        try:
-            # Load final metadata
-            metadata_path = _self.artifacts_path / "final_metadata.json"
-            with open(metadata_path, 'r') as f:
-                _self.metadata = json.load(f)
-            
-            # Load feature metadata
-            feature_metadata_path = _self.artifacts_path / "feature_metadata.json"
-            with open(feature_metadata_path, 'r') as f:
-                _self.feature_metadata = json.load(f)
-            
-            # Load optimal threshold
-            threshold_path = _self.artifacts_path / "optimal_threshold_lightgbm.txt"
-            with open(threshold_path, 'r') as f:
-                _self.optimal_threshold = float(f.read().strip())
-            
-            # Get risk bands
-            _self.risk_bands = _self.metadata.get('risk_bands', {'low_max': 30, 'med_max': 67})
-            
-            return _self.metadata, _self.feature_metadata
-        except Exception as e:
-            st.error(f"Error loading metadata: {str(e)}")
-            return None, None
-    
-    def predict_with_probability(self, features_df):
-        """Make prediction with probability scores"""
-        if self.model is None:
-            self.load_model()
+    Returns:
+        tuple: (model, final_metadata, feature_metadata, threshold)
+    """
+    try:
+        artifacts_path = Path("artifacts")
         
-        try:
-            # Get probability of being late (class 1)
-            probabilities = self.model.predict_proba(features_df)[:, 1]
-            
-            # Apply optimal threshold
-            predictions = (probabilities >= self.optimal_threshold).astype(int)
-            
-            # Calculate risk level
-            risk_levels = []
-            for prob in probabilities * 100:
-                if prob <= self.risk_bands['low_max']:
-                    risk_levels.append('Low')
-                elif prob <= self.risk_bands['med_max']:
-                    risk_levels.append('Medium')
-                else:
-                    risk_levels.append('High')
-            
-            return predictions, probabilities, risk_levels
-        except Exception as e:
-            st.error(f"Prediction error: {str(e)}")
-            return None, None, None
-    
-    def get_feature_importance(self):
-        """Get feature importance from model"""
-        if self.model is None:
-            self.load_model()
+        # Load the trained model
+        with open(artifacts_path / "best_model_lightgbm.pkl", "rb") as f:
+            model = pickle.load(f)
         
-        try:
-            importance = self.model.feature_importances_
-            feature_names = self.feature_metadata['feature_names']
-            
-            importance_df = pd.DataFrame({
-                'feature': feature_names,
-                'importance': importance
-            }).sort_values('importance', ascending=False)
-            
-            return importance_df
-        except:
-            return None
+        # Load final metadata
+        with open(artifacts_path / "final_metadata.json", "r") as f:
+            final_metadata = json.load(f)
+        
+        # Load feature metadata
+        with open(artifacts_path / "feature_metadata.json", "r") as f:
+            feature_metadata = json.load(f)
+        
+        # Load optimal threshold
+        with open(artifacts_path / "optimal_threshold_lightgbm.txt", "r") as f:
+            threshold = float(f.read().strip())
+        
+        return model, final_metadata, feature_metadata, threshold
+    
+    except Exception as e:
+        st.error(f"Error loading model artifacts: {str(e)}")
+        st.stop()
+
+
+def predict_delay(model, features_df, threshold):
+    """
+    Make predictions with the model
+    
+    Args:
+        model: Trained LightGBM model
+        features_df: DataFrame with features
+        threshold: Classification threshold
+    
+    Returns:
+        tuple: (predictions, probabilities, risk_level)
+    """
+    try:
+        # Get probability predictions
+        probabilities = model.predict_proba(features_df)[:, 1]
+        
+        # Apply threshold for binary prediction
+        predictions = (probabilities >= threshold).astype(int)
+        
+        # Determine risk level
+        risk_levels = []
+        for prob in probabilities:
+            prob_pct = prob * 100
+            if prob_pct <= 30:
+                risk_levels.append("Low")
+            elif prob_pct <= 67:
+                risk_levels.append("Medium")
+            else:
+                risk_levels.append("High")
+        
+        return predictions, probabilities, risk_levels
+    
+    except Exception as e:
+        st.error(f"Error making predictions: {str(e)}")
+        return None, None, None
+
+
+def get_model_performance():
+    """
+    Get model performance metrics
+    
+    Returns:
+        dict: Performance metrics
+    """
+    _, final_metadata, _, _ = load_model_artifacts()
+    
+    return {
+        "AUC-ROC": final_metadata["best_model_auc"],
+        "Precision": final_metadata["best_model_precision"],
+        "Recall": final_metadata["best_model_recall"],
+        "F1-Score": final_metadata["best_model_f1"]
+    }
+
+
+def get_feature_names():
+    """
+    Get list of feature names
+    
+    Returns:
+        list: Feature names
+    """
+    _, _, feature_metadata, _ = load_model_artifacts()
+    return feature_metadata["feature_names"]
+
+
+def get_feature_types():
+    """
+    Get feature type mappings
+    
+    Returns:
+        dict: Feature type categories
+    """
+    _, _, feature_metadata, _ = load_model_artifacts()
+    
+    return {
+        "numeric": feature_metadata["numeric_feats"],
+        "payment_types": feature_metadata["paytype_feats"],
+        "categorical": feature_metadata["categorical_feats"]
+    }
