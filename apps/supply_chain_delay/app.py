@@ -248,8 +248,7 @@ with st.sidebar:
         for lib in ("joblib", "lightgbm",
     "sklearn", "numpy"):
             try:
-                m =
-    importlib.import_module(lib)
+                m = importlib.import_module(lib)
                 st.write(f"{lib}",
     getattr(m, "__version__", "unknown"))
             except  Exception as e:
