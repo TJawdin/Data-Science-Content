@@ -239,3 +239,20 @@ with st.sidebar:
     - **On-Time Deliveries:** {on_time:,} ({on_time/total*100:.1f}%)
     - **Late Deliveries:** {late:,} ({late/total*100:.1f}%)
     """)
+    import sys, importlib
+    with st.sidebar:
+        st.markdown("### Runtime")
+        st.write("Python", 
+    ".".join(map(str,
+    sys.version_info[:3])))
+        for lib in ("joblib", "lightgbm",
+    "sklearn", "numpy"):
+            try:
+                m =
+    importlib.import_module(lib)
+                st.write(f"{lib}",
+    getattr(m, "__version__", "unknown"))
+            except  Exception as e:
+                st.write(f"{lib}", f"not
+    importable ({e})")
+                    
