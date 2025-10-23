@@ -185,3 +185,19 @@ def get_model_performance(final_metadata):
         'Test Samples': f"{final_metadata['n_samples_test']:,}",
         'Training Date': final_metadata['training_date']
     }
+def get_model_performance(final_metadata):
+    """
+    Format model performance metrics for display
+    
+    Args:
+        final_metadata: Dictionary containing model metadata
+        
+    Returns:
+        Dictionary with formatted performance metrics
+    """
+    return {
+        'AUC-ROC': f"{final_metadata['best_model_auc']:.1%}",
+        'Precision': f"{final_metadata['best_model_precision']:.1%}",
+        'Recall': f"{final_metadata['best_model_recall']:.1%}",
+        'F1-Score': f"{final_metadata['best_model_f1']:.1%}"
+    }
