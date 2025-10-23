@@ -96,19 +96,26 @@ def load_metadata() -> Dict[str, Any]:
         # Fallback to defaults if reading fails
         return defaults
 
-def load_model() -> Tuple[Any, Dict[str, Any]]:
-    """
-    Load the trained model artifact alongside metadata.
-    Returns (model_object, metadata_dict).
-    """
-    # Load metadata first to find the artifact filename hints
+def load_model():
     meta = load_metadata()
     hints = meta.get("artifact_files", {})
-    # Resolve model path robustly
-    model_path = _resolve_artifact(
-        filename_hint=str(hints.get("model", "")),
-        default_name="best_model_lightgbm.pkl",
-    )
+    model_path = _resolve_artifact(str(hints.get("model", "")), "best_model_lightgbm.pkl")
+    try:
+        model = joblib.load(model_path)
+    except Exception as e:
+        import sys
+        pyver = ".".join(map(str, sys.version_info[:3]))
+        raise RuntimeError(
+            "Failed to load model artifact via joblib (likely Python / library mismatch).\n"
+            f"- Running Python: {pyver}\n"
+            "- The model artifact was probably saved under Python 3.11 with specific library versions.\n"
+            "Fix:\n"
+            "  • Switch the app runtime to Python 3.11 (see runtime.txt/.python-version + host setting), OR\n"
+            "  • Re-save the model under the current Python version with matching LightGBM/sklearn.\n"
+            f"Original error: {type(e).__name__}: {e}"
+        ) from e
+    return model, meta
+
     # Load the model using joblib (works for LightGBM pickles and sklearn pipelines)
     model = joblib.load(model_path)
     return model, meta  # return both for caller convenience
