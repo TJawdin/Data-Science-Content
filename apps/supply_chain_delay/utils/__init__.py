@@ -201,12 +201,16 @@ def prepare_features(order_data, feature_names):
     Returns:
         DataFrame: Prepared features
     """
+    # Debug: Check what we received
+    if order_data is None:
+        raise ValueError("order_data is None. Check that create_example_order is returning data correctly.")
+    
     if isinstance(order_data, dict):
         return prepare_single_prediction_input(order_data, {'feature_names': feature_names})
     elif isinstance(order_data, pd.DataFrame):
         return prepare_batch_prediction_input(order_data, {'feature_names': feature_names})
     else:
-        raise ValueError("order_data must be a dict or DataFrame")
+        raise ValueError(f"order_data must be a dict or DataFrame, got {type(order_data).__name__}. Value: {order_data}")
 
 
 def create_example_order(scenario_name=None):
@@ -220,8 +224,20 @@ def create_example_order(scenario_name=None):
         dict: Order data for the scenario
     """
     scenarios = create_sample_scenarios()
-    if scenario_name:
-        return scenarios.get(scenario_name, scenarios.get('typical'))
+    
+    # If scenarios is a dict of scenarios, extract the requested one
+    if isinstance(scenarios, dict) and scenario_name:
+        # Try exact match first
+        if scenario_name in scenarios:
+            return scenarios[scenario_name]
+        # If not found, return typical or first available
+        return scenarios.get('typical', list(scenarios.values())[0] if scenarios else {})
+    
+    # If no scenario name provided, return all scenarios
+    if scenario_name is None:
+        return scenarios
+    
+    # If scenarios itself is the data (not a dict of scenarios), return it
     return scenarios
 
 
