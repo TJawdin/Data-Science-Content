@@ -14,12 +14,16 @@ def plot_risk_gauge(probability_pct, risk_category):
     Create enhanced gauge chart with arrow pointer, zone highlighting, and labels
     
     Args:
-        probability_pct: Probability as percentage (0-100)
+        probability_pct: Probability as percentage (0-100) or decimal (0-1)
         risk_category: Risk category ('Low', 'Medium', 'High')
     
     Returns:
         plotly figure
     """
+    # AUTO-CONVERT: Handle both decimal (0-1) and percentage (0-100) formats
+    if probability_pct <= 1.0:
+        probability_pct = probability_pct * 100  # Convert decimal to percentage
+    
     # Define risk bands (thresholds)
     low_max = 30
     med_max = 67
