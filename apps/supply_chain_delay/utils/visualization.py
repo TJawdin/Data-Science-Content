@@ -67,36 +67,33 @@ def plot_risk_gauge(probability_pct, risk_category):
                 'ticktext': ['0%', f'{low_max:.0f}%', f'{med_max:.0f}%', '100%'],
                 'tickfont': {'size': 15, 'family': 'Arial', 'color': '#333'}
             },
-            'bar': {'color': zone_color, 'thickness': 0.25},
+            'bar': {'color': zone_color, 'thickness': 0.4},  # This bar shows the actual value
             'bgcolor': 'white',
             'borderwidth': 2.5,
             'bordercolor': '#AAAAAA',
             'steps': [
-                # Low risk zone
+                # Low risk zone (light background)
                 {
                     'range': [0, low_max],
-                    'color': '#00CC96' if current_zone == 'low' else '#E8F7F2',
-                    'thickness': 0.75 if current_zone == 'low' else 0.65,
-                    'line': {'width': 3 if current_zone == 'low' else 1, 'color': '#00CC96'}
+                    'color': '#E8F7F2',
+                    'line': {'width': 2 if current_zone == 'low' else 1, 'color': '#00CC96'}
                 },
-                # Medium risk zone
+                # Medium risk zone (light background)
                 {
                     'range': [low_max, med_max],
-                    'color': '#FFA500' if current_zone == 'medium' else '#FFF2E0',
-                    'thickness': 0.75 if current_zone == 'medium' else 0.65,
-                    'line': {'width': 3 if current_zone == 'medium' else 1, 'color': '#FFA500'}
+                    'color': '#FFF2E0',
+                    'line': {'width': 2 if current_zone == 'medium' else 1, 'color': '#FFA500'}
                 },
-                # High risk zone
+                # High risk zone (light background)
                 {
                     'range': [med_max, 100],
-                    'color': '#EF553B' if current_zone == 'high' else '#FFEBEB',
-                    'thickness': 0.75 if current_zone == 'high' else 0.65,
-                    'line': {'width': 3 if current_zone == 'high' else 1, 'color': '#EF553B'}
+                    'color': '#FFEBEB',
+                    'line': {'width': 2 if current_zone == 'high' else 1, 'color': '#EF553B'}
                 }
             ],
             'threshold': {
-                'line': {'color': zone_color, 'width': 7},
-                'thickness': 0.95,
+                'line': {'color': zone_color, 'width': 4},
+                'thickness': 0.8,
                 'value': probability_pct
             }
         }
