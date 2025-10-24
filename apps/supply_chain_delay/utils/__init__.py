@@ -1,5 +1,6 @@
 """
 Utility functions for Supply Chain Delay Prediction App
+COMPLETE DROP-IN for utils/__init__.py
 """
 import streamlit as st
 import pandas as pd
@@ -38,6 +39,12 @@ from .theme_adaptive import (
 from .pdf_generator import (
     generate_prediction_report,
     generate_batch_report
+)
+from .formatting import (
+    format_state_name,
+    format_city_name,
+    STATE_NAMES,
+    get_state_abbreviation
 )
 
 # ============================================================================
@@ -99,63 +106,6 @@ def display_risk_badge(risk_level, probability):
         </p>
     </div>
     """, unsafe_allow_html=True)
-
-
-def calculate_temporal_features(datetime_obj):
-    """
-    Calculate temporal features from a datetime object
-    
-    Args:
-        datetime_obj: datetime object
-        
-    Returns:
-        dict: Dictionary with temporal features
-    """
-    hour = datetime_obj.hour
-    
-    return {
-        'purch_year': datetime_obj.year,
-        'purch_month': datetime_obj.month,
-        'purch_dayofweek': datetime_obj.weekday(),
-        'purch_hour': hour,
-        'purch_is_weekend': 1 if datetime_obj.weekday() >= 5 else 0,
-        'purch_hour_sin': np.sin(2 * np.pi * hour / 24),
-        'purch_hour_cos': np.cos(2 * np.pi * hour / 24)
-    }
-
-
-def get_feature_descriptions():
-    """
-    Get human-readable descriptions for features
-    
-    Returns:
-        dict: Dictionary mapping feature names to descriptions
-    """
-    return {
-        'n_items': 'Number of items in the order',
-        'n_sellers': 'Number of different sellers',
-        'n_products': 'Number of unique products',
-        'sum_price': 'Total price of all items',
-        'sum_freight': 'Total shipping cost',
-        'total_payment': 'Total payment amount',
-        'n_payment_records': 'Number of payment transactions',
-        'max_installments': 'Maximum payment installments',
-        'avg_weight_g': 'Average product weight (grams)',
-        'avg_length_cm': 'Average product length (cm)',
-        'avg_height_cm': 'Average product height (cm)',
-        'avg_width_cm': 'Average product width (cm)',
-        'n_seller_states': 'Number of seller states',
-        'purch_year': 'Purchase year',
-        'purch_month': 'Purchase month',
-        'purch_dayofweek': 'Day of week (0=Monday)',
-        'purch_hour': 'Hour of purchase (0-23)',
-        'purch_is_weekend': 'Weekend purchase indicator',
-        'est_lead_days': 'Estimated delivery lead time',
-        'n_categories': 'Number of product categories',
-        'customer_state': 'Customer state code',
-        'customer_city': 'Customer city',
-        'seller_state_mode': 'Primary seller state'
-    }
 
 
 # ============================================================================
@@ -291,69 +241,11 @@ def create_example_order(scenario_name=None):
     if scenario_name is None:
         return scenarios
     
-    # If scenarios itself is the data (not a dict of scenarios), return it
     return scenarios
 
 
-def validate_input(df, required_features):
-    """
-    Validate that input DataFrame has all required features
-    
-    Args:
-        df: Input DataFrame
-        required_features: List of required feature names
-        
-    Returns:
-        tuple: (is_valid, error_message)
-    """
-    return validate_input_data(df, {'feature_names': required_features})
-
-
-def plot_risk_distribution(risk_levels):
-    """
-    Plot distribution of risk levels
-    
-    Args:
-        risk_levels: Array of risk level strings
-        
-    Returns:
-        plotly figure
-    """
-    import plotly.graph_objects as go
-    
-    # Count risk levels
-    risk_counts = pd.Series(risk_levels).value_counts()
-    
-    colors = {
-        'Low': '#00CC96',
-        'Medium': '#FFA500',
-        'High': '#EF553B'
-    }
-    
-    fig = go.Figure(data=[
-        go.Bar(
-            x=risk_counts.index,
-            y=risk_counts.values,
-            marker=dict(
-                color=[colors.get(level, '#888888') for level in risk_counts.index]
-            ),
-            text=risk_counts.values,
-            textposition='outside'
-        )
-    ])
-    
-    fig.update_layout(
-        title="Risk Level Distribution",
-        xaxis_title="Risk Level",
-        yaxis_title="Number of Orders",
-        height=400
-    )
-    
-    return fig
-
-
 # ============================================================================
-# EXPORTS
+# EXPORT ALL PUBLIC FUNCTIONS
 # ============================================================================
 
 __all__ = [
@@ -361,6 +253,8 @@ __all__ = [
     'load_model_artifacts',
     'load_metadata',
     'predict_delay_risk',
+    'predict_delay_risk_corrected',
+    'predict_delay',
     'get_risk_category',
     'get_risk_color',
     'get_model_performance',
@@ -368,9 +262,11 @@ __all__ = [
     # Feature engineering
     'prepare_single_prediction_input',
     'prepare_batch_prediction_input',
+    'prepare_features',
     'validate_input_data',
     'get_feature_ranges',
     'create_sample_scenarios',
+    'create_example_order',
     
     # Visualization
     'plot_risk_gauge',
@@ -380,27 +276,24 @@ __all__ = [
     'plot_geographic_heatmap',
     'plot_time_trends',
     'create_metrics_cards',
-    'plot_risk_distribution',
     
     # Theme
     'apply_custom_css',
     'get_risk_color_scheme',
     'style_dataframe',
     
-    # PDF generation
+    # PDF
     'generate_prediction_report',
     'generate_batch_report',
     
-    # Helper functions
+    # Formatting
+    'format_state_name',
+    'format_city_name',
+    'STATE_NAMES',
+    'get_state_abbreviation',
+    
+    # Helpers
     'display_info_banner',
     'show_page_header',
-    'display_risk_badge',
-    'calculate_temporal_features',
-    'get_feature_descriptions',
-    
-    # Aliases for backward compatibility
-    'predict_delay',
-    'prepare_features',
-    'create_example_order',
-    'validate_input'
+    'display_risk_badge'
 ]
