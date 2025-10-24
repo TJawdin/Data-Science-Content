@@ -156,19 +156,11 @@ if df_to_analyze is not None and len(df_to_analyze) > 0:
         horizontal=True
     )
     
-    # Create a copy for display with formatted names
-    display_df = df_to_analyze.copy()
+    # IMPORTANT: Aggregate FIRST with original names, then format for display
+    # Aggregating with formatted names causes grouping issues
     
-    # Format location names based on selected level
-    if geo_level in ['customer_state', 'seller_state_mode']:
-        # Format state names: "SP" -> "SP - São Paulo"
-        display_df[geo_level] = display_df[geo_level].apply(format_state_name)
-    elif geo_level == 'customer_city':
-        # Format city names: "sao paulo" -> "São Paulo"
-        display_df[geo_level] = display_df[geo_level].apply(format_city_name)
-    
-    # Aggregate by geography
-    geo_stats = display_df.groupby(geo_level).agg({
+    # Aggregate by geography using ORIGINAL unformatted names
+    geo_stats = df_to_analyze.groupby(geo_level).agg({
         'probability': ['mean', 'median', 'std', 'count'],
         'risk_category': lambda x: (x == 'High').sum()
     }).round(4)
@@ -177,6 +169,18 @@ if df_to_analyze is not None and len(df_to_analyze) > 0:
     geo_stats['Avg_Probability_Pct'] = (geo_stats['Avg_Probability'] * 100).round(1)
     geo_stats['High_Risk_Pct'] = (geo_stats['High_Risk_Count'] / geo_stats['Order_Count'] * 100).round(1)
     geo_stats = geo_stats.reset_index()
+    
+    # NOW format location names AFTER aggregation for display purposes only
+    if geo_level in ['customer_state', 'seller_state_mode']:
+        # Format state names: "SP" -> "SP - São Paulo"
+        geo_stats[geo_level + '_display'] = geo_stats[geo_level].apply(format_state_name)
+        display_col = geo_level + '_display'
+    elif geo_level == 'customer_city':
+        # Format city names: "sao paulo" -> "São Paulo"
+        geo_stats[geo_level + '_display'] = geo_stats[geo_level].apply(format_city_name)
+        display_col = geo_level + '_display'
+    else:
+        display_col = geo_level
     
     # Create choropleth/bar chart
     st.markdown("### 📊 Risk Distribution Map")
@@ -198,7 +202,7 @@ if df_to_analyze is not None and len(df_to_analyze) > 0:
             colors.append(risk_bands['high']['color'])
     
     fig.add_trace(go.Bar(
-        x=geo_stats_sorted[geo_level],
+        x=geo_stats_sorted[display_col],
         y=geo_stats_sorted['Avg_Probability_Pct'],
         marker=dict(color=colors),
         text=geo_stats_sorted['Avg_Probability_Pct'],
@@ -229,11 +233,12 @@ if df_to_analyze is not None and len(df_to_analyze) > 0:
         top_risk = geo_stats_sorted.head(5)
         
         for idx, row in top_risk.iterrows():
+            location_display = row[display_col] if display_col in row else row[geo_level]
             st.markdown(f"""
             <div style='background-color: {risk_bands['high']['color']}22; 
                         padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem;
                         border-left: 4px solid {risk_bands['high']['color']};'>
-                <strong>{row[geo_level]}</strong><br>
+                <strong>{location_display}</strong><br>
                 Avg Risk: {row['Avg_Probability_Pct']:.1f}% | 
                 Orders: {int(row['Order_Count'])} | 
                 High Risk: {int(row['High_Risk_Count'])}
@@ -245,11 +250,12 @@ if df_to_analyze is not None and len(df_to_analyze) > 0:
         bottom_risk = geo_stats_sorted.tail(5)
         
         for idx, row in bottom_risk.iterrows():
+            location_display = row[display_col] if display_col in row else row[geo_level]
             st.markdown(f"""
             <div style='background-color: {risk_bands['low']['color']}22; 
                         padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem;
                         border-left: 4px solid {risk_bands['low']['color']};'>
-                <strong>{row[geo_level]}</strong><br>
+                <strong>{location_display}</strong><br>
                 Avg Risk: {row['Avg_Probability_Pct']:.1f}% | 
                 Orders: {int(row['Order_Count'])} | 
                 High Risk: {int(row['High_Risk_Count'])}
@@ -262,7 +268,7 @@ if df_to_analyze is not None and len(df_to_analyze) > 0:
     
     # Format for display
     display_stats_df = geo_stats_sorted[[
-        geo_level, 'Order_Count', 'Avg_Probability_Pct', 
+        display_col, 'Order_Count', 'Avg_Probability_Pct', 
         'Median_Probability', 'Std_Dev', 'High_Risk_Count', 'High_Risk_Pct'
     ]].copy()
     
@@ -289,19 +295,22 @@ if df_to_analyze is not None and len(df_to_analyze) > 0:
     highest_risk_location = geo_stats_sorted.iloc[0]
     lowest_risk_location = geo_stats_sorted.iloc[-1]
     
+    highest_display = highest_risk_location[display_col] if display_col in highest_risk_location else highest_risk_location[geo_level]
+    lowest_display = lowest_risk_location[display_col] if display_col in lowest_risk_location else lowest_risk_location[geo_level]
+    
     col1, col2, col3 = st.columns(3)
     
     with col1:
         st.metric(
             "Highest Risk Region",
-            highest_risk_location[geo_level],
+            highest_display,
             f"{highest_risk_location['Avg_Probability_Pct']:.1f}%"
         )
     
     with col2:
         st.metric(
             "Lowest Risk Region",
-            lowest_risk_location[geo_level],
+            lowest_display,
             f"{lowest_risk_location['Avg_Probability_Pct']:.1f}%"
         )
     
