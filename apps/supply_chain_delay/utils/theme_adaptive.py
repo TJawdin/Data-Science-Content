@@ -159,21 +159,19 @@ def apply_custom_css():
     }
 
     /* HOME LABEL FIX - Add this section */
-        /* Hide the default "app" label in sidebar */
-        [data-testid="stSidebarNav"] ul li:first-child {
-            display: none;
+        /* Hide the text "app" but keep the link clickable */
+        [data-testid="stSidebarNav"] ul li:first-child a {
+            visibility: hidden;
+            position: relative;
         }
         
-    /* Add "Home" label at top of sidebar navigation */
-        [data-testid="stSidebarNav"]::before {
+    /* Replace with "Home" text */
+        [data-testid="stSidebarNav"] ul li:first-child a::before {
             content: "🏠 Home";
-            margin-left: 1rem;
-            margin-top: 1.2rem;
-            margin-bottom: 0.5rem;
-            font-size: 1rem;
-            position: relative;
-            display: block;
-            font-weight: 600;
+            visibility: visible;
+            position: absolute;
+            left: 0;
+            top: 0;
         }
         /* END HOME LABEL FIX */
     </style>
