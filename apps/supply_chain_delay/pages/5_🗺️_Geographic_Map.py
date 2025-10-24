@@ -58,7 +58,7 @@ if data_source == "Generate Sample Data":
     col1, col2 = st.columns(2)
     
     with col1:
-        n_samples = st.slider("Number of samples", 20, 200, 100)
+        n_samples = st.slider("Number of samples", 100, 500, 1000)
     
     with col2:
         if st.button("🔄 Generate Sample Data", type="primary", use_container_width=True):
@@ -146,11 +146,10 @@ if df_to_analyze is not None and len(df_to_analyze) > 0:
     # Geography selection - WITH SESSION STATE KEY TO PREVENT RESET
     geo_level = st.radio(
         "Geographic Level:",
-        options=["customer_state", "customer_city", "seller_state_mode"],
+        options=["customer_state", "customer_city"],
         format_func=lambda x: {
             'customer_state': 'Customer State',
-            'customer_city': 'Customer City',
-            'seller_state_mode': 'Seller State'
+            'customer_city': 'Customer City'
         }[x],
         key='geo_level',  # THIS IS THE CRITICAL FIX - prevents page reset!
         horizontal=True
@@ -171,16 +170,14 @@ if df_to_analyze is not None and len(df_to_analyze) > 0:
     geo_stats = geo_stats.reset_index()
     
     # NOW format location names AFTER aggregation for display purposes only
-    if geo_level in ['customer_state', 'seller_state_mode']:
+    if geo_level == 'customer_state':
         # Format state names: "SP" -> "SP - São Paulo"
-        geo_stats[geo_level + '_display'] = geo_stats[geo_level].apply(format_state_name)
-        display_col = geo_level + '_display'
+        geo_stats['location_display'] = geo_stats[geo_level].apply(format_state_name)
     elif geo_level == 'customer_city':
         # Format city names: "sao paulo" -> "São Paulo"
-        geo_stats[geo_level + '_display'] = geo_stats[geo_level].apply(format_city_name)
-        display_col = geo_level + '_display'
-    else:
-        display_col = geo_level
+        geo_stats['location_display'] = geo_stats[geo_level].apply(format_city_name)
+    
+    display_col = 'location_display'
     
     # Create choropleth/bar chart
     st.markdown("### 📊 Risk Distribution Map")
