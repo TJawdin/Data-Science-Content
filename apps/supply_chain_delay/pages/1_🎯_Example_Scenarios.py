@@ -188,24 +188,6 @@ with col3:
 
 st.markdown("---")
 
-# Feature importance for this prediction
-st.markdown("### 📈 Feature Importance")
-st.markdown("*Top features contributing to the model's predictions*")
-
-# Get feature importance from model
-if hasattr(model, 'feature_importances_'):
-    feature_importance = model.feature_importances_
-    fig_importance = plot_feature_importance(
-        feature_metadata['feature_names'],
-        feature_importance,
-        top_n=15
-    )
-    st.plotly_chart(fig_importance, use_container_width=True)
-else:
-    st.info("Feature importance visualization not available for this model type.")
-
-st.markdown("---")
-
 # Recommendations
 st.markdown("### 💡 Recommendations")
 
