@@ -138,11 +138,10 @@ supply_chain_app/
 │
 └── pages/                             # Multi-page app sections
     ├── 1_🎯_Example_Scenarios.py     # Pre-configured examples
-    ├── 2_📊_Model_Diagnostics.py     # Model performance analysis
-    ├── 3_🔮_Single_Prediction.py     # Individual order predictions
-    ├── 4_📦_Batch_Predictions.py     # Bulk CSV processing
-    ├── 5_🗺️_Geographic_Map.py        # Regional risk analysis
-    └── 6_📈_Time_Analysis.py         # Temporal pattern analysis
+    ├── 2_🔮_Single_Prediction.py     # Individual order predictions
+    ├── 3_📦_Batch_Predictions.py     # Bulk CSV processing
+    ├── 4_🗺️_Geographic_Map.py        # Regional risk analysis
+    └── 5_📈_Time_Analysis.py         # Temporal pattern analysis
 ```
 
 ## 🎯 Page-by-Page Usage Guide
@@ -164,18 +163,7 @@ supply_chain_app/
 
 **Use Case**: Training, demonstrations, model validation
 
-### 2️⃣ Model Diagnostics
-**Purpose**: Deep dive into model performance and capabilities
-
-**Features**:
-- Performance metrics dashboard
-- Feature importance analysis
-- Risk distribution visualization
-- Model characteristics explanation
-
-**Use Case**: Model evaluation, stakeholder presentations
-
-### 3️⃣ Single Prediction
+### 2️⃣ Single Prediction
 **Purpose**: Predict delay risk for individual orders
 
 **How to Use**:
@@ -194,7 +182,7 @@ supply_chain_app/
 - Professional PDF reports
 - State/city names properly formatted
 
-### 4️⃣ Batch Predictions
+### 3️⃣ Batch Predictions
 **Purpose**: Process multiple orders efficiently
 
 **How to Use**:
@@ -227,7 +215,7 @@ supply_chain_app/
 - Progress indicators for large files
 - Session state preservation
 
-### 5️⃣ Geographic Map
+### 4️⃣ Geographic Map
 **Purpose**: Analyze delivery risk by location
 
 **How to Use**:
@@ -251,7 +239,7 @@ supply_chain_app/
 - Color-coded risk levels
 - CSV export capability
 
-### 6️⃣ Time Analysis
+### 5️⃣ Time Analysis
 **Purpose**: Identify temporal patterns in delay risk
 
 **How to Use**:
