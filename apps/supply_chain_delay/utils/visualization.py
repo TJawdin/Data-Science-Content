@@ -34,7 +34,7 @@ def plot_risk_gauge(probability_pct, risk_category):
         zone_color = '#00CC96'
         zone_name = 'Low Risk'
     elif probability_pct <= med_max:
-        current_zone = 'medium'
+        current_zone = 'low'
         zone_color = '#FFA500'
         zone_name = 'Medium Risk'
     else:
