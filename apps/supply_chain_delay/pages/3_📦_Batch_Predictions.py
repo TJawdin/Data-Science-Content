@@ -44,6 +44,203 @@ st.markdown("""
 
 """)
 
+# ============================================================================
+# NEW: SAMPLE DATA GENERATOR
+# ============================================================================
+st.markdown("---")
+st.markdown("### 🎲 Generate Sample Data")
+st.markdown("Don't have a CSV file? Generate realistic sample data to test batch predictions!")
+
+col1, col2, col3 = st.columns([2, 2, 1])
+
+with col1:
+    sample_size = st.selectbox(
+        "Number of sample orders:",
+        options=[100, 200, 300, 400, 500, 600, 700, 800, 900, 1000],
+        index=0,
+        help="Select how many sample orders to generate"
+    )
+
+with col2:
+    risk_distribution = st.selectbox(
+        "Risk distribution:",
+        options=['Balanced Mix', 'More Low Risk', 'More High Risk', 'Random'],
+        help="Choose how risks should be distributed in the sample data"
+    )
+
+with col3:
+    if st.button("🎲 Generate", type="primary", use_container_width=True):
+        with st.spinner(f"Generating {sample_size} sample orders..."):
+            
+            # Define risk distribution weights
+            if risk_distribution == 'Balanced Mix':
+                low_weight, med_weight, high_weight = 0.33, 0.34, 0.33
+            elif risk_distribution == 'More Low Risk':
+                low_weight, med_weight, high_weight = 0.50, 0.30, 0.20
+            elif risk_distribution == 'More High Risk':
+                low_weight, med_weight, high_weight = 0.20, 0.30, 0.50
+            else:  # Random
+                low_weight, med_weight, high_weight = 0.33, 0.34, 0.33
+            
+            # Brazilian states and cities
+            brazilian_states = ['SP', 'RJ', 'MG', 'RS', 'PR', 'SC', 'BA', 'DF', 'ES', 'GO', 
+                               'PE', 'CE', 'PA', 'AM', 'MA', 'RN', 'PB', 'AL', 'PI', 'SE']
+            
+            cities_by_state = {
+                'SP': ['sao paulo', 'campinas', 'santos', 'sorocaba', 'guarulhos', 'osasco'],
+                'RJ': ['rio de janeiro', 'niteroi', 'duque de caxias', 'sao goncalo'],
+                'MG': ['belo horizonte', 'uberlandia', 'contagem', 'juiz de fora'],
+                'RS': ['porto alegre', 'caxias do sul', 'pelotas'],
+                'AM': ['manaus', 'itacoatiara'],
+                'BA': ['salvador', 'feira de santana', 'vitoria da conquista'],
+                'DF': ['brasilia'],
+                'SC': ['florianopolis', 'joinville', 'blumenau'],
+                'PR': ['curitiba', 'londrina', 'maringa'],
+                'CE': ['fortaleza', 'juazeiro do norte']
+            }
+            
+            categories = ['electronics', 'furniture_decor', 'health_beauty', 'sports_leisure',
+                         'bed_bath_table', 'computers_accessories', 'housewares', 'watches_gifts',
+                         'telephony', 'auto', 'toys', 'cool_stuff', 'perfumery', 'baby',
+                         'fashion_bags_accessories']
+            
+            sample_orders = []
+            
+            # Determine how many of each risk level
+            n_low = int(sample_size * low_weight)
+            n_med = int(sample_size * med_weight)
+            n_high = sample_size - n_low - n_med
+            
+            risk_types = ['low'] * n_low + ['medium'] * n_med + ['high'] * n_high
+            np.random.shuffle(risk_types)
+            
+            for risk_type in risk_types:
+                # Set parameters based on desired risk level
+                if risk_type == 'low':
+                    # Low risk: Big cities, short lead times, standard products
+                    state = np.random.choice(['SP', 'RJ', 'MG', 'RS', 'PR'])
+                    est_lead_days = np.random.uniform(2, 5)
+                    sum_freight = np.random.uniform(8, 25)
+                    n_items = np.random.randint(1, 3)
+                    n_sellers = 1
+                    purch_hour = np.random.randint(9, 18)  # Business hours
+                    purch_dayofweek = np.random.randint(0, 5)  # Weekday
+                    purch_month = np.random.choice([2, 3, 4, 5, 8, 9, 10])  # Non-holiday
+                    
+                elif risk_type == 'medium':
+                    # Medium risk: Mixed scenarios
+                    state = np.random.choice(brazilian_states[:15])
+                    est_lead_days = np.random.uniform(5, 10)
+                    sum_freight = np.random.uniform(20, 50)
+                    n_items = np.random.randint(2, 5)
+                    n_sellers = np.random.randint(1, 3)
+                    purch_hour = np.random.randint(0, 24)
+                    purch_dayofweek = np.random.randint(0, 7)
+                    purch_month = np.random.randint(1, 13)
+                    
+                else:  # high risk
+                    # High risk: Remote areas, long lead times, complex orders
+                    state = np.random.choice(['AM', 'RR', 'AP', 'AC', 'RO', 'PA', 'MA', 'PI'])
+                    est_lead_days = np.random.uniform(12, 25)
+                    sum_freight = np.random.uniform(60, 150)
+                    n_items = np.random.randint(4, 10)
+                    n_sellers = np.random.randint(2, 5)
+                    purch_hour = np.random.choice([22, 23, 0, 1, 2, 3])  # Late night
+                    purch_dayofweek = np.random.choice([5, 6])  # Weekend
+                    purch_month = np.random.choice([11, 12, 1])  # Holiday season
+                
+                # Get city for state
+                city = np.random.choice(cities_by_state.get(state, ['capital']))
+                
+                # Generate order details
+                seller_state = np.random.choice(['SP', 'RJ', 'MG', 'SC', 'PR'])
+                category = np.random.choice(categories)
+                n_products = n_items
+                n_categories = np.random.randint(1, min(n_items + 1, 4))
+                
+                # Pricing
+                item_price = np.random.uniform(30, 500)
+                sum_price = item_price * n_items
+                total_payment = sum_price + sum_freight
+                
+                # Payment
+                payment_type = np.random.choice(['credit_card', 'boleto', 'debit_card', 'voucher'])
+                max_installments = np.random.choice([1, 2, 3, 6, 10, 12]) if payment_type == 'credit_card' else 1
+                
+                # Physical dimensions
+                avg_weight_g = np.random.uniform(300, 5000)
+                avg_length_cm = np.random.uniform(10, 60)
+                avg_height_cm = np.random.uniform(5, 40)
+                avg_width_cm = np.random.uniform(8, 50)
+                
+                # Temporal features
+                purch_is_weekend = 1 if purch_dayofweek >= 5 else 0
+                purch_hour_sin = np.sin(2 * np.pi * purch_hour / 24)
+                purch_hour_cos = np.cos(2 * np.pi * purch_hour / 24)
+                
+                order = {
+                    'n_items': n_items,
+                    'n_sellers': n_sellers,
+                    'n_products': n_products,
+                    'sum_price': round(sum_price, 2),
+                    'sum_freight': round(sum_freight, 2),
+                    'total_payment': round(total_payment, 2),
+                    'n_payment_records': 1,
+                    'max_installments': max_installments,
+                    'avg_weight_g': round(avg_weight_g, 1),
+                    'avg_length_cm': round(avg_length_cm, 1),
+                    'avg_height_cm': round(avg_height_cm, 1),
+                    'avg_width_cm': round(avg_width_cm, 1),
+                    'n_seller_states': n_sellers,
+                    'purch_year': 2024,
+                    'purch_month': purch_month,
+                    'purch_dayofweek': purch_dayofweek,
+                    'purch_hour': purch_hour,
+                    'purch_is_weekend': purch_is_weekend,
+                    'purch_hour_sin': round(purch_hour_sin, 6),
+                    'purch_hour_cos': round(purch_hour_cos, 6),
+                    'est_lead_days': round(est_lead_days, 1),
+                    'n_categories': n_categories,
+                    'mode_category_count': np.random.randint(1, n_items + 1),
+                    'paytype_boleto': 1 if payment_type == 'boleto' else 0,
+                    'paytype_credit_card': 1 if payment_type == 'credit_card' else 0,
+                    'paytype_debit_card': 1 if payment_type == 'debit_card' else 0,
+                    'paytype_not_defined': 0,
+                    'paytype_voucher': 1 if payment_type == 'voucher' else 0,
+                    'mode_category': category,
+                    'seller_state_mode': seller_state,
+                    'customer_city': city,
+                    'customer_state': state
+                }
+                
+                sample_orders.append(order)
+            
+            # Create DataFrame
+            sample_df = pd.DataFrame(sample_orders)
+            
+            # Generate CSV for download
+            csv_data = sample_df.to_csv(index=False)
+            
+            st.success(f"✅ Generated {sample_size} sample orders!")
+            
+            # Show preview
+            with st.expander("👁️ Preview Generated Data (First 10 Rows)"):
+                st.dataframe(sample_df.head(10), use_container_width=True)
+            
+            # Download button
+            st.download_button(
+                label=f"📥 Download Sample Data ({sample_size} orders)",
+                data=csv_data,
+                file_name=f"sample_orders_{sample_size}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True,
+                type="primary"
+            )
+            
+            st.info("💡 Download this file and upload it below to test batch predictions!")
+
+st.markdown("---")
+
 # Feature requirements
 with st.expander("📄 View Required CSV Format & Download Template"):
     st.markdown("### Required Columns")
@@ -70,9 +267,9 @@ with st.expander("📄 View Required CSV Format & Download Template"):
         for feat in features[2*third:]:
             st.text(f"• {feat}")
     
-    # Create sample template
+    # Create sample template (small)
     st.markdown("---")
-    st.markdown("### 📥 Download Template")
+    st.markdown("### 📥 Download Small Template (3 orders)")
     
     sample_data = {
         'n_items': [2, 1, 5],
@@ -113,11 +310,11 @@ with st.expander("📄 View Required CSV Format & Download Template"):
     
     csv = template_df.to_csv(index=False)
     st.download_button(
-        label="📥 Download CSV Template",
+        label="📥 Download Minimal Template",
         data=csv,
         file_name="batch_prediction_template.csv",
         mime="text/csv",
-        help="Download a sample CSV file with the correct format"
+        help="Download a minimal CSV file with just 3 sample orders"
     )
 
 st.markdown("---")
@@ -389,12 +586,12 @@ if 'predictions_made' in st.session_state and st.session_state['predictions_made
 
 else:
     # Show placeholder when no predictions yet
-    st.info("👆 Upload a CSV file to get started with batch predictions")
+    st.info("👆 Generate sample data or upload a CSV file to get started with batch predictions")
 
 # Footer
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: gray;">
-    <p>💡 Tip: Process large batches efficiently by ensuring your CSV is properly formatted before upload</p>
+    <p>💡 Tip: Use the sample data generator to create test files with different risk distributions</p>
 </div>
 """, unsafe_allow_html=True)
