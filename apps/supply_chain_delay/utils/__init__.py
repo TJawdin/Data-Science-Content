@@ -39,6 +39,12 @@ from .pdf_generator import (
     generate_prediction_report,
     generate_batch_report
 )
+from .formatting import (
+    format_state_name,
+    format_city_name,
+    STATE_NAMES,
+    get_state_abbreviation
+)
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -361,6 +367,7 @@ __all__ = [
     'load_model_artifacts',
     'load_metadata',
     'predict_delay_risk',
+    'predict_delay_risk_corrected',
     'get_risk_category',
     'get_risk_color',
     'get_model_performance',
@@ -390,6 +397,12 @@ __all__ = [
     # PDF generation
     'generate_prediction_report',
     'generate_batch_report',
+    
+    # Formatting
+    'format_state_name',
+    'format_city_name',
+    'STATE_NAMES',
+    'get_state_abbreviation',
     
     # Helper functions
     'display_info_banner',
