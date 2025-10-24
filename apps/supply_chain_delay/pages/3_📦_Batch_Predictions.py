@@ -11,7 +11,6 @@ from utils import (
     load_model_artifacts,
     predict_delay,
     prepare_features,
-    validate_input,
     apply_custom_css,
     show_page_header,
     plot_probability_distribution,
@@ -338,12 +337,38 @@ if uploaded_file is not None:
         # Validate data
         st.markdown("### 🔍 Data Validation")
         
-        is_valid, error_message = validate_input(df, feature_metadata['feature_names'])
+        # Check for required columns
+        required_features = feature_metadata['feature_names']
+        missing_features = [f for f in required_features if f not in df.columns]
         
-        if not is_valid:
-            st.error(f"❌ Validation Error: {error_message}")
-            st.info("Please ensure your CSV file contains all required columns with correct names.")
+        if len(missing_features) > 0:
+            st.error(f"❌ Missing Required Columns")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("**Columns Found in Your File:**")
+                st.code('\n'.join(sorted(df.columns)[:20]))
+                if len(df.columns) > 20:
+                    st.info(f"...and {len(df.columns) - 20} more columns")
+            
+            with col2:
+                st.markdown("**Missing Required Columns:**")
+                st.code('\n'.join(missing_features))
+            
+            st.info("💡 Tip: Download the template or generate sample data to see the correct format.")
             st.stop()
+        
+        # Check for empty dataframe
+        if len(df) == 0:
+            st.error("❌ File is empty - no rows to process")
+            st.stop()
+        
+        # Check for columns with all null values (warning only)
+        null_columns = [col for col in required_features if df[col].isna().all()]
+        if len(null_columns) > 0:
+            st.warning(f"⚠️ Warning: These columns contain all null values: {', '.join(null_columns[:5])}")
+            st.info("This may affect prediction quality. Please check your data.")
         
         st.success("✅ Data validation passed!")
         
