@@ -15,7 +15,9 @@ from utils import (
     show_page_header,
     predict_delay,
     prepare_features,
-    create_example_order
+    create_example_order,
+    format_state_name,
+    format_city_name
 )
 
 # Page config
@@ -116,6 +118,8 @@ if data_source == "Generate Sample Data":
                 df['probability'] = probabilities_list
                 df['risk_category'] = risk_levels_list
                 
+                # Store in session state to prevent loss on radio button click
+                st.session_state['geo_analysis_df'] = df
                 df_to_analyze = df
                 st.success(f"✅ Generated {len(df_to_analyze)} sample orders")
 
@@ -126,12 +130,20 @@ elif data_source == "Use Batch Results":
     else:
         st.warning("⚠️ No batch results found. Please run batch predictions first on the Batch Predictions page.")
 
+# Check if we have data in session state from previous interaction
+if df_to_analyze is None and 'geo_analysis_df' in st.session_state:
+    df_to_analyze = st.session_state['geo_analysis_df']
+
 # Analysis section
 if df_to_analyze is not None and len(df_to_analyze) > 0:
     st.markdown("---")
     st.markdown("## 🗺️ Geographic Analysis")
     
-    # Geography selection
+    # Initialize session state for geographic level if not exists
+    if 'geo_level' not in st.session_state:
+        st.session_state.geo_level = 'customer_state'
+    
+    # Geography selection - WITH SESSION STATE KEY TO PREVENT RESET
     geo_level = st.radio(
         "Geographic Level:",
         options=["customer_state", "customer_city", "seller_state_mode"],
@@ -140,11 +152,23 @@ if df_to_analyze is not None and len(df_to_analyze) > 0:
             'customer_city': 'Customer City',
             'seller_state_mode': 'Seller State'
         }[x],
+        key='geo_level',  # THIS IS THE CRITICAL FIX - prevents page reset!
         horizontal=True
     )
     
+    # Create a copy for display with formatted names
+    display_df = df_to_analyze.copy()
+    
+    # Format location names based on selected level
+    if geo_level in ['customer_state', 'seller_state_mode']:
+        # Format state names: "SP" -> "SP - São Paulo"
+        display_df[geo_level] = display_df[geo_level].apply(format_state_name)
+    elif geo_level == 'customer_city':
+        # Format city names: "sao paulo" -> "São Paulo"
+        display_df[geo_level] = display_df[geo_level].apply(format_city_name)
+    
     # Aggregate by geography
-    geo_stats = df_to_analyze.groupby(geo_level).agg({
+    geo_stats = display_df.groupby(geo_level).agg({
         'probability': ['mean', 'median', 'std', 'count'],
         'risk_category': lambda x: (x == 'High').sum()
     }).round(4)
@@ -190,7 +214,8 @@ if df_to_analyze is not None and len(df_to_analyze) > 0:
         yaxis_title="Average Delay Probability (%)",
         height=500,
         showlegend=False,
-        hovermode='x'
+        hovermode='x',
+        xaxis_tickangle=-45  # Angle labels for better readability with long names
     )
     
     st.plotly_chart(fig, use_container_width=True)
@@ -236,18 +261,18 @@ if df_to_analyze is not None and len(df_to_analyze) > 0:
     st.markdown("### 📊 Detailed Geographic Statistics")
     
     # Format for display
-    display_df = geo_stats_sorted[[
+    display_stats_df = geo_stats_sorted[[
         geo_level, 'Order_Count', 'Avg_Probability_Pct', 
         'Median_Probability', 'Std_Dev', 'High_Risk_Count', 'High_Risk_Pct'
     ]].copy()
     
-    display_df.columns = [
+    display_stats_df.columns = [
         'Location', 'Orders', 'Avg Risk (%)', 
         'Median Prob', 'Std Dev', 'High Risk Orders', 'High Risk %'
     ]
     
     st.dataframe(
-        display_df.style.format({
+        display_stats_df.style.format({
             'Avg Risk (%)': '{:.1f}',
             'Median Prob': '{:.4f}',
             'Std Dev': '{:.4f}',
@@ -335,7 +360,7 @@ if df_to_analyze is not None and len(df_to_analyze) > 0:
     st.markdown("---")
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
-        csv_data = display_df.to_csv(index=False)
+        csv_data = display_stats_df.to_csv(index=False)
         st.download_button(
             label="📥 Download Geographic Analysis",
             data=csv_data,
