@@ -293,40 +293,40 @@ def create_sample_scenarios():
         'typical': {
             # Order characteristics - moderate
             'n_items': 2,
-            'n_sellers': 2,
+            'n_sellers': 1,  # Single seller (pushes toward high risk)
             'n_products': 2,
             'n_categories': 1,
             'mode_category_count': 2,
             'mode_category': 'electronics',
             
             # Financial - medium freight
-            'sum_price': 200.0,
-            'sum_freight': 20.0,
-            'total_payment': 220.0,
+            'sum_price': 150.0,
+            'sum_freight': 30.0,  # Medium-high freight (pushes toward high risk)
+            'total_payment': 180.0,
             'n_payment_records': 1,
-            'max_installments': 3,
+            'max_installments': 2,
             
             # Dimensions - medium
-            'avg_weight_g': 2500.0,
-            'avg_length_cm': 35.0,
-            'avg_height_cm': 18.0,
-            'avg_width_cm': 25.0,
+            'avg_weight_g': 2000.0,
+            'avg_length_cm': 30.0,
+            'avg_height_cm': 15.0,
+            'avg_width_cm': 20.0,
             
-            # Geographic - MG (moderate)
-            'customer_city': 'belo horizonte',
-            'customer_state': 'MG',
+            # Geographic - RJ (moderate state, not extreme like SP or PR)
+            'customer_city': 'rio de janeiro',
+            'customer_state': 'RJ',
             'seller_state_mode': 'SP',
             'n_seller_states': 1,
             
-            # Temporal - moderate month
+            # Temporal - moderate month and lead time
             'purch_year': 2024,
-            'purch_month': 9,  # September
-            'purch_dayofweek': 3,
-            'purch_hour': 16,
+            'purch_month': 8,  # August - middle of year
+            'purch_dayofweek': 3,  # Thursday
+            'purch_hour': 15,
             'purch_is_weekend': 0,
-            'purch_hour_sin': np.sin(2 * np.pi * 16 / 24),
-            'purch_hour_cos': np.cos(2 * np.pi * 16 / 24),
-            'est_lead_days': 12.0,  # Medium lead time
+            'purch_hour_sin': np.sin(2 * np.pi * 15 / 24),
+            'purch_hour_cos': np.cos(2 * np.pi * 15 / 24),
+            'est_lead_days': 10.0,  # Medium lead time (between 3 and 25)
             
             # Payment type
             'paytype_boleto': 0,
