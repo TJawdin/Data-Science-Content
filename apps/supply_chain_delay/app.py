@@ -26,25 +26,6 @@ st.set_page_config(
 
 # Custom CSS to rename "app" to "Home" in sidebar  
 st.markdown("""
-<style>
-    /* Hide app label */
-    [data-testid="stSidebarNav"] ul li:first-child {
-        display: none;
-    }
-    
-    /* Add Home link */
-    [data-testid="stSidebarNav"]::before {
-        content: "🏠 Home";
-        margin-left: 1rem;
-        margin-top: 1.2rem;
-        margin-bottom: 0.5rem;
-        font-size: 1rem;
-        position: relative;
-        display: block;
-        font-weight: 600;
-    }
-</style>
-""", unsafe_allow_html=True)
 
 # Apply custom styling
 apply_custom_css()
