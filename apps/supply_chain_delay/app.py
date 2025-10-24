@@ -24,23 +24,24 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS to rename "app" to "Home" in sidebar
+# Custom CSS to rename "app" to "Home" in sidebar  
 st.markdown("""
 <style>
-    /* Hide the default "app" label */
-    section[data-testid="stSidebarNav"] li:first-child {
+    /* Hide app label */
+    [data-testid="stSidebarNav"] ul li:first-child {
         display: none;
     }
     
-    /* Add custom "Home" label */
-    section[data-testid="stSidebarNav"]::before {
+    /* Add Home link */
+    [data-testid="stSidebarNav"]::before {
         content: "🏠 Home";
-        display: block;
-        padding: 0.5rem 1rem;
+        margin-left: 1rem;
+        margin-top: 1.2rem;
         margin-bottom: 0.5rem;
-        font-size: 1.1rem;
+        font-size: 1rem;
+        position: relative;
+        display: block;
         font-weight: 600;
-        color: #262730;
     }
 </style>
 """, unsafe_allow_html=True)
