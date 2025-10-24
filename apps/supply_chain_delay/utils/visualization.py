@@ -13,12 +13,6 @@ def plot_risk_gauge(probability_pct, risk_category):
     """
     Create enhanced gauge chart with arrow pointer, zone highlighting, and labels
     
-    Combines:
-    - Prominent zone highlighting
-    - Clean arrow pointer
-    - Zone labels for clarity
-    - Professional styling
-    
     Args:
         probability_pct: Probability as percentage (0-100)
         risk_category: Risk category ('Low', 'Medium', 'High')
@@ -69,7 +63,7 @@ def plot_risk_gauge(probability_pct, risk_category):
                 'ticktext': ['0%', f'{low_max:.0f}%', f'{med_max:.0f}%', '100%'],
                 'tickfont': {'size': 15, 'family': 'Arial', 'color': '#333'}
             },
-            'bar': {'color': zone_color, 'thickness': 0.25},  # Visible progress bar
+            'bar': {'color': zone_color, 'thickness': 0.25},
             'bgcolor': 'white',
             'borderwidth': 2.5,
             'bordercolor': '#AAAAAA',
@@ -104,48 +98,13 @@ def plot_risk_gauge(probability_pct, risk_category):
         }
     ))
     
-    # Add arrow pointer annotation
-    angle = 180 - (probability_pct / 100) * 180  # Convert to degrees
-    angle_rad = np.radians(angle)
-    
-    # Arrow pointing from center to value
-    arrow_length = 0.38
-    arrow_x = 0.5 + arrow_length * np.cos(angle_rad)
-    arrow_y = 0.47 + arrow_length * np.sin(angle_rad)
-    
-    fig.add_annotation(
-        x=arrow_x,
-        y=arrow_y,
-        ax=0.5,
-        ay=0.47,
-        xref='paper',
-        yref='paper',
-        axref='paper',
-        ayref='paper',
-        showarrow=True,
-        arrowhead=2,
-        arrowsize=1.8,
-        arrowwidth=5,
-        arrowcolor=zone_color,
-    )
-    
-    # Add center dot where arrow originates
-    fig.add_shape(
-        type='circle',
-        xref='paper',
-        yref='paper',
-        x0=0.475, y0=0.445,
-        x1=0.525, y1=0.495,
-        fillcolor=zone_color,
-        line_color='white',
-        line_width=2
-    )
-    
     # Add zone labels at bottom
     fig.add_annotation(
         text="<b>Low</b>",
-        x=0.15, y=0.04,
-        xref='paper', yref='paper',
+        x=0.15, 
+        y=0.04,
+        xref='paper', 
+        yref='paper',
         showarrow=False,
         font={
             'size': 15 if current_zone == 'low' else 13,
@@ -156,8 +115,10 @@ def plot_risk_gauge(probability_pct, risk_category):
     
     fig.add_annotation(
         text="<b>Medium</b>",
-        x=0.5, y=0.01,
-        xref='paper', yref='paper',
+        x=0.5, 
+        y=0.01,
+        xref='paper', 
+        yref='paper',
         showarrow=False,
         font={
             'size': 15 if current_zone == 'medium' else 13,
@@ -168,32 +129,16 @@ def plot_risk_gauge(probability_pct, risk_category):
     
     fig.add_annotation(
         text="<b>High</b>",
-        x=0.85, y=0.04,
-        xref='paper', yref='paper',
+        x=0.85, 
+        y=0.04,
+        xref='paper', 
+        yref='paper',
         showarrow=False,
         font={
             'size': 15 if current_zone == 'high' else 13,
             'color': '#EF553B' if current_zone == 'high' else '#999',
             'family': 'Arial Black' if current_zone == 'high' else 'Arial'
         }
-    )
-    
-    # Add subtle glow effect to active zone label
-    if current_zone == 'low':
-        label_x, label_y = 0.15, 0.04
-    elif current_zone == 'medium':
-        label_x, label_y = 0.5, 0.01
-    else:
-        label_x, label_y = 0.85, 0.04
-    
-    fig.add_shape(
-        type='circle',
-        xref='paper', yref='paper',
-        x0=label_x - 0.03, y0=label_y - 0.015,
-        x1=label_x + 0.03, y1=label_y + 0.015,
-        fillcolor=zone_color,
-        opacity=0.1,
-        line_width=0
     )
     
     fig.update_layout(
