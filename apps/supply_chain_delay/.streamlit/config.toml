@@ -12,23 +12,3 @@ enableCORS = false
 
 [browser]
 gatherUsageStats = false
-
-st.markdown("""
-<style>
-    /* Hide the default "app" label */
-    section[data-testid="stSidebarNav"] li:first-child {
-        display: none;
-    }
-    
-    /* Add custom "Home" label */
-    section[data-testid="stSidebarNav"]::before {
-        content: "🏠 Home";
-        display: block;
-        padding: 0.5rem 1rem;
-        margin-bottom: 0.5rem;
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: #262730;
-    }
-</style>
-""", unsafe_allow_html=True)
