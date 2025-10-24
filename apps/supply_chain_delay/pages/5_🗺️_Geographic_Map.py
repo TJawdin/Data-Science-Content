@@ -58,7 +58,7 @@ if data_source == "Generate Sample Data":
     col1, col2 = st.columns(2)
     
     with col1:
-        n_samples = st.slider("Number of samples", 100, 500, 1000)
+        n_samples = st.slider("Number of samples", 20, 200, 100)
     
     with col2:
         if st.button("🔄 Generate Sample Data", type="primary", use_container_width=True):
@@ -125,7 +125,17 @@ if data_source == "Generate Sample Data":
 
 elif data_source == "Use Batch Results":
     if 'prediction_results' in st.session_state:
-        df_to_analyze = st.session_state['prediction_results']
+        df_to_analyze = st.session_state['prediction_results'].copy()
+        
+        # COMPATIBILITY FIX: Handle different column names from batch predictions
+        # Batch predictions might use 'risk_level' instead of 'risk_category'
+        if 'risk_level' in df_to_analyze.columns and 'risk_category' not in df_to_analyze.columns:
+            df_to_analyze['risk_category'] = df_to_analyze['risk_level']
+        
+        # Ensure probability column exists (might be 'delay_probability')
+        if 'delay_probability' in df_to_analyze.columns and 'probability' not in df_to_analyze.columns:
+            df_to_analyze['probability'] = df_to_analyze['delay_probability']
+        
         st.success(f"✅ Using {len(df_to_analyze)} orders from batch predictions")
     else:
         st.warning("⚠️ No batch results found. Please run batch predictions first on the Batch Predictions page.")
