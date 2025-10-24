@@ -99,49 +99,6 @@ def plot_risk_gauge(probability_pct, risk_category):
         }
     ))
     
-    # Add zone labels at bottom
-    fig.add_annotation(
-        text="<b>Low</b>",
-        x=0.15, 
-        y=0.04,
-        xref='paper', 
-        yref='paper',
-        showarrow=False,
-        font={
-            'size': 15 if current_zone == 'low' else 13,
-            'color': '#00CC96' if current_zone == 'low' else '#999',
-            'family': 'Arial Black' if current_zone == 'low' else 'Arial'
-        }
-    )
-    
-    fig.add_annotation(
-        text="<b>Medium</b>",
-        x=0.5, 
-        y=0.01,
-        xref='paper', 
-        yref='paper',
-        showarrow=False,
-        font={
-            'size': 15 if current_zone == 'medium' else 13,
-            'color': '#FFA500' if current_zone == 'medium' else '#999',
-            'family': 'Arial Black' if current_zone == 'medium' else 'Arial'
-        }
-    )
-    
-    fig.add_annotation(
-        text="<b>High</b>",
-        x=0.85, 
-        y=0.04,
-        xref='paper', 
-        yref='paper',
-        showarrow=False,
-        font={
-            'size': 15 if current_zone == 'high' else 13,
-            'color': '#EF553B' if current_zone == 'high' else '#999',
-            'family': 'Arial Black' if current_zone == 'high' else 'Arial'
-        }
-    )
-    
     fig.update_layout(
         height=430,
         margin=dict(l=20, r=20, t=90, b=50),
