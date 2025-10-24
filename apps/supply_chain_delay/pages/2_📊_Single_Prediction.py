@@ -351,7 +351,7 @@ if predict_button:
         col1, col2 = st.columns([1, 2])
         
         with col1:
-            display_risk_badge(risk_level, probability)
+            
             
             st.markdown("### Key Metrics")
             st.metric("Delay Probability", f"{probability*100:.1f}%")
