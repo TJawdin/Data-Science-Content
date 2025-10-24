@@ -11,7 +11,13 @@ import streamlit as st
 
 def plot_risk_gauge(probability_pct, risk_category):
     """
-    Create gauge chart showing risk probability
+    Create enhanced gauge chart with arrow pointer, zone highlighting, and labels
+    
+    Combines:
+    - Prominent zone highlighting
+    - Clean arrow pointer
+    - Zone labels for clarity
+    - Professional styling
     
     Args:
         probability_pct: Probability as percentage (0-100)
@@ -20,44 +26,182 @@ def plot_risk_gauge(probability_pct, risk_category):
     Returns:
         plotly figure
     """
-    # Color based on risk
-    color_map = {
-        "Low": "#00CC96",
-        "Medium": "#FFA500", 
-        "High": "#EF553B"
-    }
-    color = color_map.get(risk_category, "#888888")
+    # Define risk bands (thresholds)
+    low_max = 30
+    med_max = 67
     
-    fig = go.Figure(go.Indicator(
+    # Determine which zone we're in
+    if probability_pct <= low_max:
+        current_zone = 'low'
+        zone_color = '#00CC96'
+        zone_name = 'Low Risk'
+    elif probability_pct <= med_max:
+        current_zone = 'medium'
+        zone_color = '#FFA500'
+        zone_name = 'Medium Risk'
+    else:
+        current_zone = 'high'
+        zone_color = '#EF553B'
+        zone_name = 'High Risk'
+    
+    fig = go.Figure()
+    
+    # Add the main gauge
+    fig.add_trace(go.Indicator(
         mode="gauge+number",
         value=probability_pct,
-        domain={'x': [0, 1], 'y': [0, 1]},
-        title={'text': "Delay Risk Probability", 'font': {'size': 20}},
-        number={'suffix': "%", 'font': {'size': 50}},
+        domain={'x': [0, 1], 'y': [0.12, 1]},
+        number={
+            'suffix': '%',
+            'font': {'size': 52, 'color': zone_color, 'family': 'Arial Black'}
+        },
+        title={
+            'text': f"<b>{zone_name}</b><br><span style='font-size:15px; color:#666'>Delay Probability</span>",
+            'font': {'size': 26, 'color': zone_color}
+        },
         gauge={
-            'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "darkgray"},
-            'bar': {'color': color},
-            'bgcolor': "white",
-            'borderwidth': 2,
-            'bordercolor': "gray",
+            'axis': {
+                'range': [0, 100],
+                'tickwidth': 2.5,
+                'tickcolor': 'darkgray',
+                'tickmode': 'array',
+                'tickvals': [0, low_max, med_max, 100],
+                'ticktext': ['0%', f'{low_max:.0f}%', f'{med_max:.0f}%', '100%'],
+                'tickfont': {'size': 15, 'family': 'Arial', 'color': '#333'}
+            },
+            'bar': {'color': zone_color, 'thickness': 0.25},  # Visible progress bar
+            'bgcolor': 'white',
+            'borderwidth': 2.5,
+            'bordercolor': '#AAAAAA',
             'steps': [
-                {'range': [0, 30], 'color': '#E8F8F5'},
-                {'range': [30, 67], 'color': '#FFF4E6'},
-                {'range': [67, 100], 'color': '#FADBD8'}
+                # Low risk zone
+                {
+                    'range': [0, low_max],
+                    'color': '#00CC96' if current_zone == 'low' else '#E8F7F2',
+                    'thickness': 0.75 if current_zone == 'low' else 0.65,
+                    'line': {'width': 3 if current_zone == 'low' else 1, 'color': '#00CC96'}
+                },
+                # Medium risk zone
+                {
+                    'range': [low_max, med_max],
+                    'color': '#FFA500' if current_zone == 'medium' else '#FFF2E0',
+                    'thickness': 0.75 if current_zone == 'medium' else 0.65,
+                    'line': {'width': 3 if current_zone == 'medium' else 1, 'color': '#FFA500'}
+                },
+                # High risk zone
+                {
+                    'range': [med_max, 100],
+                    'color': '#EF553B' if current_zone == 'high' else '#FFEBEB',
+                    'thickness': 0.75 if current_zone == 'high' else 0.65,
+                    'line': {'width': 3 if current_zone == 'high' else 1, 'color': '#EF553B'}
+                }
             ],
             'threshold': {
-                'line': {'color': "red", 'width': 4},
-                'thickness': 0.75,
-                'value': 67
+                'line': {'color': zone_color, 'width': 7},
+                'thickness': 0.95,
+                'value': probability_pct
             }
         }
     ))
     
+    # Add arrow pointer annotation
+    angle = 180 - (probability_pct / 100) * 180  # Convert to degrees
+    angle_rad = np.radians(angle)
+    
+    # Arrow pointing from center to value
+    arrow_length = 0.38
+    arrow_x = 0.5 + arrow_length * np.cos(angle_rad)
+    arrow_y = 0.47 + arrow_length * np.sin(angle_rad)
+    
+    fig.add_annotation(
+        x=arrow_x,
+        y=arrow_y,
+        ax=0.5,
+        ay=0.47,
+        xref='paper',
+        yref='paper',
+        axref='paper',
+        ayref='paper',
+        showarrow=True,
+        arrowhead=2,
+        arrowsize=1.8,
+        arrowwidth=5,
+        arrowcolor=zone_color,
+    )
+    
+    # Add center dot where arrow originates
+    fig.add_shape(
+        type='circle',
+        xref='paper',
+        yref='paper',
+        x0=0.475, y0=0.445,
+        x1=0.525, y1=0.495,
+        fillcolor=zone_color,
+        line_color='white',
+        line_width=2
+    )
+    
+    # Add zone labels at bottom
+    fig.add_annotation(
+        text="<b>Low</b>",
+        x=0.15, y=0.04,
+        xref='paper', yref='paper',
+        showarrow=False,
+        font={
+            'size': 15 if current_zone == 'low' else 13,
+            'color': '#00CC96' if current_zone == 'low' else '#999',
+            'family': 'Arial Black' if current_zone == 'low' else 'Arial'
+        }
+    )
+    
+    fig.add_annotation(
+        text="<b>Medium</b>",
+        x=0.5, y=0.01,
+        xref='paper', yref='paper',
+        showarrow=False,
+        font={
+            'size': 15 if current_zone == 'medium' else 13,
+            'color': '#FFA500' if current_zone == 'medium' else '#999',
+            'family': 'Arial Black' if current_zone == 'medium' else 'Arial'
+        }
+    )
+    
+    fig.add_annotation(
+        text="<b>High</b>",
+        x=0.85, y=0.04,
+        xref='paper', yref='paper',
+        showarrow=False,
+        font={
+            'size': 15 if current_zone == 'high' else 13,
+            'color': '#EF553B' if current_zone == 'high' else '#999',
+            'family': 'Arial Black' if current_zone == 'high' else 'Arial'
+        }
+    )
+    
+    # Add subtle glow effect to active zone label
+    if current_zone == 'low':
+        label_x, label_y = 0.15, 0.04
+    elif current_zone == 'medium':
+        label_x, label_y = 0.5, 0.01
+    else:
+        label_x, label_y = 0.85, 0.04
+    
+    fig.add_shape(
+        type='circle',
+        xref='paper', yref='paper',
+        x0=label_x - 0.03, y0=label_y - 0.015,
+        x1=label_x + 0.03, y1=label_y + 0.015,
+        fillcolor=zone_color,
+        opacity=0.1,
+        line_width=0
+    )
+    
     fig.update_layout(
-        height=300,
-        margin=dict(l=20, r=20, t=50, b=20),
+        height=430,
+        margin=dict(l=20, r=20, t=90, b=50),
         paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)'
+        plot_bgcolor='rgba(0,0,0,0)',
+        font={'family': 'Arial, sans-serif'}
     )
     
     return fig
