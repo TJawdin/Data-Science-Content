@@ -53,10 +53,7 @@ def plot_risk_gauge(probability_pct, risk_category):
             'suffix': '%',
             'font': {'size': 52, 'color': zone_color, 'family': 'Arial Black'}
         },
-        title={
-            'text': f"<b>{zone_name}</b><br><span style='font-size:15px; color:#666'> Probability</span>",
-            'font': {'size': 26, 'color': zone_color}
-        },
+    
         gauge={
             'axis': {
                 'range': [0, 100],
