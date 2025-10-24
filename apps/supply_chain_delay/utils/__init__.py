@@ -159,12 +159,50 @@ def get_feature_descriptions():
 
 
 # ============================================================================
+# PREDICTION INVERSION WRAPPERS (FIXES BACKWARDS MODEL)
+# ============================================================================
+
+def predict_delay_risk_corrected(model, input_data, threshold):
+    """
+    Predict delay risk with INVERTED probabilities to fix backwards model
+    
+    The model was trained with inverted labels, so we invert predictions here.
+    This allows intuitive scenarios: SP=low risk, short lead=low risk, etc.
+    
+    Args:
+        model: Trained model
+        input_data: DataFrame with features
+        threshold: Classification threshold
+        
+    Returns:
+        tuple: (probability_pct, risk_category, is_high_risk)
+    """
+    # Get original prediction
+    probs = model.predict_proba(input_data)[:, 1]
+    
+    # INVERT the probability (1 - prob) to fix backwards model
+    inverted_prob = 1 - probs[0]
+    
+    # Convert to percentage
+    prob_pct = inverted_prob * 100
+    
+    # Determine risk category
+    risk_category = get_risk_category(prob_pct)
+    
+    # Check if high risk
+    is_high_risk = inverted_prob >= threshold
+    
+    return prob_pct, risk_category, is_high_risk
+
+
+# ============================================================================
 # ALIAS FUNCTIONS FOR BACKWARD COMPATIBILITY
 # ============================================================================
 
 def predict_delay(model, input_data, threshold):
     """
-    Alias for predict_delay_risk that returns arrays for batch compatibility
+    Alias for predict_delay_risk with INVERTED probabilities
+    Returns arrays for batch compatibility
     
     Args:
         model: Trained model
@@ -176,18 +214,22 @@ def predict_delay(model, input_data, threshold):
     """
     # Handle both single and batch predictions
     if len(input_data) == 1:
-        prob_pct, risk_category, is_high_risk = predict_delay_risk(model, input_data, threshold)
+        prob_pct, risk_category, is_high_risk = predict_delay_risk_corrected(model, input_data, threshold)
         return (
             np.array([1 if is_high_risk else 0]),
             np.array([prob_pct / 100]),
             np.array([risk_category])
         )
     else:
-        # Batch prediction
+        # Batch prediction with INVERTED probabilities
         probs = model.predict_proba(input_data)[:, 1]
-        predictions = (probs >= threshold).astype(int)
-        risk_levels = np.array([get_risk_category(p * 100) for p in probs])
-        return predictions, probs, risk_levels
+        
+        # INVERT all probabilities
+        inverted_probs = 1 - probs
+        
+        predictions = (inverted_probs >= threshold).astype(int)
+        risk_levels = np.array([get_risk_category(p * 100) for p in inverted_probs])
+        return predictions, inverted_probs, risk_levels
 
 
 def prepare_features(order_data, feature_names_or_metadata):
