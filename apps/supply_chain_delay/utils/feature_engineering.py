@@ -229,60 +229,55 @@ def get_feature_ranges(feature_metadata):
 
 def create_sample_scenarios():
     """
-    Create example scenarios based on EMPIRICAL TESTING (not SHAP)
+    Create intuitive example scenarios (predictions are inverted in code)
     
-    Threshold: 0.6693 (66.93%)
-    
-    ACTUAL model behavior (opposite to SHAP expectations):
-    - Month 2 (Feb) = LOW risk (<67%), Month 6 (June) = HIGH risk (>67%)
-    - LONG lead times = LOW risk, SHORT lead times = HIGH risk
-    - State PR = LOW risk, State SP = HIGH risk
-    - LOW freight = LOW risk, HIGH freight = HIGH risk
-    - Multiple sellers = LOW risk, Single seller = HIGH risk
+    These scenarios now work intuitively:
+    - Low risk: Simple order, SP, short lead time, high freight
+    - High risk: Complex order, remote state, long lead time, low freight
     
     Returns:
         dict: Scenario name to complete input values mapping
     """
     scenarios = {
         'low_risk': {
-            # Order characteristics - MULTIPLE sellers (reduces risk!)
-            'n_items': 3,
-            'n_sellers': 3,
-            'n_products': 3,
-            'n_categories': 2,
-            'mode_category_count': 2,
-            'mode_category': 'furniture_decor',
+            # Order characteristics - simple, single item
+            'n_items': 1,
+            'n_sellers': 1,
+            'n_products': 1,
+            'n_categories': 1,
+            'mode_category_count': 1,
+            'mode_category': 'health_beauty',
             
-            # Financial - LOW freight reduces risk!
-            'sum_price': 400.0,
-            'sum_freight': 10.0,  # Low freight = low risk
-            'total_payment': 410.0,
+            # Financial - high freight (premium shipping = reliable)
+            'sum_price': 100.0,
+            'sum_freight': 50.0,  # High freight = premium = low risk
+            'total_payment': 150.0,
             'n_payment_records': 1,
-            'max_installments': 6,
+            'max_installments': 1,
             
-            # Dimensions - large
-            'avg_weight_g': 4000.0,
-            'avg_length_cm': 50.0,
-            'avg_height_cm': 30.0,
-            'avg_width_cm': 40.0,
+            # Dimensions - small, lightweight
+            'avg_weight_g': 800.0,
+            'avg_length_cm': 20.0,
+            'avg_height_cm': 10.0,
+            'avg_width_cm': 15.0,
             
-            # Geographic - PR reduces risk!
-            'customer_city': 'curitiba',
-            'customer_state': 'PR',  # PR = low risk
+            # Geographic - SP (São Paulo - major hub, good logistics)
+            'customer_city': 'sao paulo',
+            'customer_state': 'SP',
             'seller_state_mode': 'SP',
-            'n_seller_states': 2,
+            'n_seller_states': 1,
             
-            # Temporal - Month 2 reduces risk!
+            # Temporal - mid-year, weekday, business hours
             'purch_year': 2024,
-            'purch_month': 2,  # February = LOW risk
-            'purch_dayofweek': 1,
-            'purch_hour': 14,
+            'purch_month': 6,  # June - mid-year
+            'purch_dayofweek': 2,  # Wednesday
+            'purch_hour': 10,
             'purch_is_weekend': 0,
-            'purch_hour_sin': np.sin(2 * np.pi * 14 / 24),
-            'purch_hour_cos': np.cos(2 * np.pi * 14 / 24),
-            'est_lead_days': 25.0,  # LONG lead time = LOW risk!
+            'purch_hour_sin': np.sin(2 * np.pi * 10 / 24),
+            'purch_hour_cos': np.cos(2 * np.pi * 10 / 24),
+            'est_lead_days': 3.0,  # Short lead time = low risk
             
-            # Payment type
+            # Payment type - credit card
             'paytype_boleto': 0,
             'paytype_credit_card': 1,
             'paytype_debit_card': 0,
@@ -293,7 +288,7 @@ def create_sample_scenarios():
         'typical': {
             # Order characteristics - moderate
             'n_items': 2,
-            'n_sellers': 1,  # Single seller (pushes toward high risk)
+            'n_sellers': 1,
             'n_products': 2,
             'n_categories': 1,
             'mode_category_count': 2,
@@ -301,7 +296,7 @@ def create_sample_scenarios():
             
             # Financial - medium freight
             'sum_price': 150.0,
-            'sum_freight': 30.0,  # Medium-high freight (pushes toward high risk)
+            'sum_freight': 30.0,
             'total_payment': 180.0,
             'n_payment_records': 1,
             'max_installments': 2,
@@ -312,21 +307,21 @@ def create_sample_scenarios():
             'avg_height_cm': 15.0,
             'avg_width_cm': 20.0,
             
-            # Geographic - RJ (moderate state, not extreme like SP or PR)
+            # Geographic - RJ (Rio - moderate)
             'customer_city': 'rio de janeiro',
             'customer_state': 'RJ',
             'seller_state_mode': 'SP',
             'n_seller_states': 1,
             
-            # Temporal - moderate month and lead time
+            # Temporal - moderate
             'purch_year': 2024,
-            'purch_month': 8,  # August - middle of year
-            'purch_dayofweek': 3,  # Thursday
+            'purch_month': 8,  # August
+            'purch_dayofweek': 3,
             'purch_hour': 15,
             'purch_is_weekend': 0,
             'purch_hour_sin': np.sin(2 * np.pi * 15 / 24),
             'purch_hour_cos': np.cos(2 * np.pi * 15 / 24),
-            'est_lead_days': 10.0,  # Medium lead time (between 3 and 25)
+            'est_lead_days': 10.0,  # Medium lead time
             
             # Payment type
             'paytype_boleto': 0,
@@ -337,46 +332,46 @@ def create_sample_scenarios():
         },
         
         'high_risk': {
-            # Order characteristics - SINGLE seller (increases risk!)
-            'n_items': 1,
-            'n_sellers': 1,
-            'n_products': 1,
-            'n_categories': 1,
-            'mode_category_count': 1,
-            'mode_category': 'health_beauty',
+            # Order characteristics - complex, multiple sellers
+            'n_items': 3,
+            'n_sellers': 3,
+            'n_products': 3,
+            'n_categories': 2,
+            'mode_category_count': 2,
+            'mode_category': 'furniture_decor',
             
-            # Financial - HIGH freight increases risk!
-            'sum_price': 100.0,
-            'sum_freight': 50.0,  # High freight = high risk
-            'total_payment': 150.0,
+            # Financial - LOW freight (cheap shipping = unreliable)
+            'sum_price': 400.0,
+            'sum_freight': 10.0,  # Low freight = cheap = high risk
+            'total_payment': 410.0,
             'n_payment_records': 1,
-            'max_installments': 1,
+            'max_installments': 6,
             
-            # Dimensions - small
-            'avg_weight_g': 800.0,
-            'avg_length_cm': 20.0,
-            'avg_height_cm': 10.0,
-            'avg_width_cm': 15.0,
+            # Dimensions - large, heavy
+            'avg_weight_g': 4000.0,
+            'avg_length_cm': 50.0,
+            'avg_height_cm': 30.0,
+            'avg_width_cm': 40.0,
             
-            # Geographic - SP increases risk!
-            'customer_city': 'sao paulo',
-            'customer_state': 'SP',  # SP = high risk
+            # Geographic - PR (Paraná - farther from main hubs)
+            'customer_city': 'curitiba',
+            'customer_state': 'PR',
             'seller_state_mode': 'SP',
-            'n_seller_states': 1,
+            'n_seller_states': 2,
             
-            # Temporal - Month 6 increases risk!
+            # Temporal - early year (busy season), weekend
             'purch_year': 2024,
-            'purch_month': 6,  # June = HIGH risk
-            'purch_dayofweek': 2,
-            'purch_hour': 10,
-            'purch_is_weekend': 0,
-            'purch_hour_sin': np.sin(2 * np.pi * 10 / 24),
-            'purch_hour_cos': np.cos(2 * np.pi * 10 / 24),
-            'est_lead_days': 3.0,  # SHORT lead time = HIGH risk!
+            'purch_month': 2,  # February - busy period
+            'purch_dayofweek': 6,  # Sunday
+            'purch_hour': 22,
+            'purch_is_weekend': 1,
+            'purch_hour_sin': np.sin(2 * np.pi * 22 / 24),
+            'purch_hour_cos': np.cos(2 * np.pi * 22 / 24),
+            'est_lead_days': 25.0,  # Long lead time = high risk
             
-            # Payment type
-            'paytype_boleto': 0,
-            'paytype_credit_card': 1,
+            # Payment type - boleto (slower processing)
+            'paytype_boleto': 1,
+            'paytype_credit_card': 0,
             'paytype_debit_card': 0,
             'paytype_not_defined': 0,
             'paytype_voucher': 0
